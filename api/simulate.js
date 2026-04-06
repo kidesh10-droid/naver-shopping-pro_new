@@ -45,7 +45,7 @@ module.exports = async (req, res) => {
     });
 
     if (!data.body || data.body.trim() === '') {
-      return res.status(200).json({ errorMessage: '네이버 데이터 응답 없음' });
+      return res.status(200).json({ errorMessage: '네이버 응답 없음' });
     }
 
     const parsed = JSON.parse(data.body);
@@ -55,15 +55,7 @@ module.exports = async (req, res) => {
       return res.status(200).json({ errorMessage: '분석할 데이터가 없습니다.' });
     }
 
-    const main = kwList.find(k => k.relKeyword === keyword) || kwList[0];
-    
-    // --- [에러 방지: 모든 숫자 필드 강제 초기화] ---
-    const pcQcCnt = parseInt(main.monthlyPcQcCnt) || 0;
-    const mobileQcCnt = parseInt(main.monthlyMobileQcCnt) || 0;
-    const totalQcCnt = pcQcCnt + mobileQcCnt;
-    const navCompIdx = main.compIdx || 'mid';
-
-    // [진짜 분석 알고리즘]
+    // --- [분석 알고리즘 함수] ---
     const analyzeShoppingMarket = (kw, idx, total, isMobile) => {
       const intensity = Math.pow(Math.log10(total + 10), 2.7);
       const commercePatterns = /기$|기기$|용$|세트$|제$|약$|폰$|장기$|기구$|템$|용품$|웨어$|화$|백$|이어폰$/;
@@ -75,8 +67,9 @@ module.exports = async (req, res) => {
       if (idx === 'high' && total > 10000 && estCpc < 1700) {
         estCpc = 1750 + (total / 1500); 
       }
-      if (kw.includes('이어폰')) estCpc = 4850; // MD님 실무 데이터 고정
-      if (kw.includes('포장기')) estCpc = 1850; // MD님 실무 데이터 고정
+      // MD 실무 데이터 고정 구간
+      if (kw.includes('이어폰')) return 4850;
+      if (kw.includes('포장기')) return 1850;
 
       return Math.floor(estCpc);
     };
@@ -89,38 +82,53 @@ module.exports = async (req, res) => {
     };
 
     const isMobile = device === 'mobile';
-    const cpc = analyzeShoppingMarket(keyword, navCompIdx, totalQcCnt, isMobile);
-    const realStatus = getRealStatus(cpc, totalQcCnt, navCompIdx);
     const budgetNum = parseInt(budget) || 100000;
 
-    // --- [최종 결과 전송: 프론트엔드가 요구하는 모든 Key 포함] ---
+    // --- [메인 키워드 데이터 추출] ---
+    const main = kwList.find(k => k.relKeyword === keyword) || kwList[0];
+    const mPc = parseInt(main.monthlyPcQcCnt) || 0;
+    const mMob = parseInt(main.monthlyMobileQcCnt) || 0;
+    const mTotal = mPc + mMob;
+    const mCpc = analyzeShoppingMarket(main.relKeyword, main.compIdx, mTotal, isMobile);
+    const mStatus = getRealStatus(mCpc, mTotal, main.compIdx);
+
+    // --- [연관 키워드 데이터 추출 - 모든 필드 강제 채움] ---
+    const related = kwList.slice(0, 10).map(k => {
+      const rPc = parseInt(k.monthlyPcQcCnt) || 0;
+      const rMob = parseInt(k.monthlyMobileQcCnt) || 0;
+      const rTotal = rPc + rMob;
+      const rCpc = analyzeShoppingMarket(k.relKeyword, k.compIdx, rTotal, isMobile);
+      const rStatus = getRealStatus(rCpc, rTotal, k.compIdx);
+
+      return {
+        keyword: k.relKeyword || "",
+        pcQcCnt: rPc,                // 필수
+        mobileQcCnt: rMob,            // 필수
+        totalQcCnt: rTotal,           // 필수 (에러 발생 포인트 1)
+        cpcAvg: rCpc,                 // 필수
+        cpcMin: Math.floor(rCpc * 0.8),
+        cpcMax: Math.floor(rCpc * 1.2),
+        compIdx: rStatus.label,       // 필수 (에러 발생 포인트 2)
+        estClicks: Math.floor(budgetNum / rCpc) || 0
+      };
+    });
+
+    // --- [최종 응답 전송] ---
     return res.status(200).json({
-      keyword: keyword,
+      keyword: main.relKeyword,
       device: device || 'pc',
       budget: budgetNum,
-      pcQcCnt: pcQcCnt,           // .toLocaleString() 에러 방지
-      mobileQcCnt: mobileQcCnt,   // .toLocaleString() 에러 방지
-      totalQcCnt: totalQcCnt,     // .toLocaleString() 에러 방지
-      cpc: cpc,                   // .toLocaleString() 에러 방지
-      cpcMin: Math.floor(cpc * 0.8),
-      cpcMax: Math.floor(cpc * 1.3),
-      estClicks: Math.floor(budgetNum / cpc),
-      estImpressions: Math.floor(totalQcCnt * 0.12),
-      compIdx: realStatus.label,
-      compColor: realStatus.color,
-      related: kwList.slice(0, 10).map(k => {
-        const kt = (parseInt(k.monthlyPcQcCnt) || 0) + (parseInt(k.monthlyMobileQcCnt) || 0);
-        const kc = analyzeShoppingMarket(k.relKeyword, k.compIdx, kt, isMobile);
-        return {
-          keyword: k.relKeyword,
-          pcQcCnt: parseInt(k.monthlyPcQcCnt) || 0,
-          mobileQcCnt: parseInt(k.monthlyMobileQcCnt) || 0,
-          totalQcCnt: kt,
-          cpcAvg: kc,
-          compIdx: getRealStatus(kc, kt, k.compIdx).label,
-          estClicks: Math.floor(budgetNum / kc)
-        };
-      })
+      pcQcCnt: mPc,                 // 필수
+      mobileQcCnt: mMob,             // 필수
+      totalQcCnt: mTotal,            // 필수
+      cpc: mCpc,                     // 필수
+      cpcMin: Math.floor(mCpc * 0.8),
+      cpcMax: Math.floor(mCpc * 1.3),
+      estClicks: Math.floor(budgetNum / mCpc),
+      estImpressions: Math.floor(mTotal * 0.12),
+      compIdx: mStatus.label,
+      compColor: mStatus.color,
+      related: related               // 보강된 배열
     });
 
   } catch(e) {
