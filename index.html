@@ -814,29 +814,23 @@ function renderSim(kw,budget,dev,data) {
 
   document.getElementById('simGrid').innerHTML = `
     <div class="sim-card"><div class="sim-icon">🔍</div><div class="sim-lbl">월간 총 검색량</div><div class="sim-val g">${data.totalQcCnt.toLocaleString()}</div><div class="sim-sub">PC ${data.pcQcCnt.toLocaleString()} + 모바일 ${data.mobileQcCnt.toLocaleString()}</div></div>
-    <div class="sim-card"><div class="sim-icon">💰</div><div class="sim-lbl">평균 CPC</div><div class="sim-val o">${data.cpc>0?data.cpc.toLocaleString()+'원':'데이터 없음'}</div><div class="sim-sub">${dev==='mobile'?'모바일':'PC'} 기준</div></div>
+    <div class="sim-card"><div class="sim-icon">💰</div><div class="sim-lbl">예상 평균 CPC</div><div class="sim-val o">${data.cpc.toLocaleString()}원</div><div class="sim-sub">${data.cpcMin.toLocaleString()}~${data.cpcMax.toLocaleString()}원 범위</div></div>
     <div class="sim-card"><div class="sim-icon">👆</div><div class="sim-lbl">예상 일 클릭수</div><div class="sim-val b">${data.estClicks.toLocaleString()}</div><div class="sim-sub">예산 ${budget.toLocaleString()}원 기준</div></div>
-    <div class="sim-card"><div class="sim-icon">👁️</div><div class="sim-lbl">예상 노출수</div><div class="sim-val p">${data.estImpressions.toLocaleString()}</div><div class="sim-sub">CTR ${data.ctr}% 기준</div></div>
-    <div class="sim-card"><div class="sim-icon">📊</div><div class="sim-lbl">PC 평균 CPC</div><div class="sim-val">${data.pcCpc>0?data.pcCpc.toLocaleString()+'원':'-'}</div><div class="sim-sub">PC 기준</div></div>
-    <div class="sim-card"><div class="sim-icon">📱</div><div class="sim-lbl">모바일 평균 CPC</div><div class="sim-val">${data.mobileCpc>0?data.mobileCpc.toLocaleString()+'원':'-'}</div><div class="sim-sub">모바일 기준</div></div>`;
+    <div class="sim-card"><div class="sim-icon">📊</div><div class="sim-lbl">광고 경쟁강도</div><div class="sim-val" style="color:${compColor}">${compText}</div><div class="sim-sub">${kw} 기준</div></div>
+    <div class="sim-card"><div class="sim-icon">👁️</div><div class="sim-lbl">예상 노출수</div><div class="sim-val p">${data.estImpressions.toLocaleString()}</div><div class="sim-sub">${dev==='mobile'?'모바일':'PC'} 기준</div></div>
+    <div class="sim-card"><div class="sim-icon">📈</div><div class="sim-lbl">월간 예산 추천</div><div class="sim-val" style="color:var(--purple)">${(data.cpc*30*5).toLocaleString()}원~</div><div class="sim-sub">일 5클릭 목표 기준</div></div>`;
 
-  // 경쟁강도
-  const compVal = data.compIdx==='high'?85:data.compIdx==='mid'?50:20;
-
-  // 연관 키워드 입찰가 테이블
-  const maxCpc = Math.max(...(data.related||[]).map(r => dev==='mobile'?r.mobileCpc:r.pcCpc));
+  const maxCpc = Math.max(...(data.related||[]).map(r=>r.cpcAvg));
   const rows = (data.related||[]).map(r => {
-    const cpc = dev==='mobile' ? r.mobileCpc : r.pcCpc;
     const total = r.pcQcCnt + r.mobileQcCnt;
-    const pct = maxCpc>0 ? Math.round((cpc/maxCpc)*100) : 0;
+    const pct = maxCpc>0 ? Math.round((r.cpcAvg/maxCpc)*100) : 0;
     const cl = r.compIdx==='high'?'#D84315':r.compIdx==='mid'?'#F59E0B':'#03C75A';
     const cl2 = r.compIdx==='high'?'높음':r.compIdx==='mid'?'중간':'낮음';
-    const estD = cpc>0 ? Math.floor(budget/cpc) : 0;
     return `<tr>
       <td style="font-weight:500">${r.keyword}</td>
       <td>${total.toLocaleString()}</td>
-      <td><div class="bid-bar"><div class="bid-bar-in" style="width:${pct}%;max-width:80px"></div><span style="font-size:12px;margin-left:4px">${cpc>0?cpc.toLocaleString()+'원':'-'}</span></div></td>
-      <td style="font-weight:700;color:var(--green)">${estD>0?estD.toLocaleString()+'회':'-'}</td>
+      <td><div class="bid-bar"><div class="bid-bar-in" style="width:${pct}%;max-width:80px"></div><span style="font-size:12px;margin-left:4px">${r.cpcMin.toLocaleString()}~${r.cpcMax.toLocaleString()}원</span></div></td>
+      <td style="font-weight:700;color:var(--green)">${r.estClicks.toLocaleString()}회</td>
       <td><span style="color:${cl};font-weight:500">${cl2}</span></td>
     </tr>`;
   }).join('');
@@ -844,9 +838,10 @@ function renderSim(kw,budget,dev,data) {
   document.getElementById('simSec').innerHTML = `
     <div class="sechd">
       <span class="sect">연관 키워드 입찰가 분석</span>
-      <span class="secs">예산 ${budget.toLocaleString()}원 기준 · <span style="color:${compColor};font-weight:700">${kw} 경쟁강도: ${compText}</span></span>
+      <span class="secs">예산 ${budget.toLocaleString()}원 기준 · 경쟁강도 기반 예상값</span>
     </div>
-    <table><thead><tr><th>키워드</th><th>월간 검색량</th><th>평균 CPC</th><th>예상 일 클릭</th><th>경쟁도</th></tr></thead>
+    <div style="padding:10px 18px;font-size:12px;color:var(--t3);border-bottom:1px solid var(--bd);">⚠️ CPC는 경쟁강도 기반 예상값입니다. 실제 입찰가와 다를 수 있어요.</div>
+    <table><thead><tr><th>키워드</th><th>월간 검색량</th><th>예상 CPC 범위</th><th>예상 일 클릭</th><th>경쟁도</th></tr></thead>
     <tbody>${rows}</tbody></table>`;
 
   sh('sRes');
