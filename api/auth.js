@@ -90,6 +90,16 @@ module.exports = async (req, res) => {
       return res.status(200).json({ user: { ...user, ...userData } });
     }
 
+    // 비밀번호 찾기
+    if (action === 'forgot') {
+      const { email } = req.body || {};
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: process.env.SITE_URL + '/reset-password'
+      });
+      if (error) return res.status(400).json({ error: error.message });
+      return res.status(200).json({ success: true });
+    }
+
     return res.status(400).json({ error: '잘못된 요청' });
   } catch(e) {
     res.status(500).json({ error: e.message });
