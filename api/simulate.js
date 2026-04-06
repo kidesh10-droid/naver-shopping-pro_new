@@ -19,7 +19,7 @@ module.exports = async (req, res) => {
     const data = await new Promise((resolve, reject) => {
       function doReq(opts) {
         https.request(opts, (r) => {
-          if ([301,302,308].includes(r.statusCode)) {
+          if ([301, 302, 308].includes(r.statusCode)) {
             const u = new URL(r.headers.location);
             doReq({ ...opts, hostname: u.hostname, path: u.pathname + u.search });
             return;
@@ -54,44 +54,90 @@ module.exports = async (req, res) => {
     const totalCnt = pcCnt + mobCnt;
     const compIdx = main.compIdx || 'mid';
 
-    // 경쟁강도 기반 예상 CPC 범위
+    // --- [MD 보정 로직 시작] ---
+    
+    // 1. 기본 CPC 범위 설정 (현실적인 쇼핑광고 수준으로 상향)
     const cpcRange = {
-      high:   { pc: { min: 800,  max: 3000, avg: 1500 }, mobile: { min: 400,  max: 1500, avg: 800  } },
-      mid:    { pc: { min: 300,  max: 800,  avg: 500  }, mobile: { min: 150,  max: 500,  avg: 300  } },
-      low:    { pc: { min: 50,   max: 300,  avg: 150  }, mobile: { min: 30,   max: 150,  avg: 80   } },
+      high: { pc: { min: 800, max: 5000, avg: 1800 }, mobile: { min: 500, max: 3000, avg: 1200 } },
+      mid: { pc: { min: 300, max: 1200, avg: 600 }, mobile: { min: 200, max: 800, avg: 400 } },
+      low: { pc: { min: 70, max: 400, avg: 200 }, mobile: { min: 50, max: 250, avg: 120 } },
     };
+
+    // 2. 키워드 성격에 따른 가중치 부여 함수
+    const getAdjustedCpc = (kw, baseAvg, idx, total) => {
+      let factor = 1.0;
+      const highValueKw = ['이어폰', '가전', '노트북', '청소기', '다이어트', '영양제', '화장품', '침대'];
+      
+      // 고단가/고경쟁 카테고리 가중치
+      if (highValueKw.some(v => kw.includes(v))) factor *= 2.2;
+      
+      // 검색량 폭발 키워드 가중치 (High 경쟁일 때)
+      if (idx === 'high' && total > 50000) factor *= 1.8;
+      else if (idx === 'high' && total > 10000) factor *= 1.4;
+
+      return Math.floor(baseAvg * factor);
+    };
+
     const range = cpcRange[compIdx] || cpcRange['mid'];
     const devRange = device === 'mobile' ? range.mobile : range.pc;
-    const cpc = devRange.avg;
+    
+    // 최종 보정된 CPC
+    const cpc = getAdjustedCpc(keyword, devRange.avg, compIdx, totalCnt);
     const budgetNum = parseInt(budget) || 100000;
+    
+    // 예상 클릭수 & 노출수 재계산
     const estClicks = Math.floor(budgetNum / cpc);
-    const estImpressions = Math.floor(estClicks * (100 / (devRange.avg / 100)));
+    // 노출수는 검색량의 일부가 광고 지면으로 전환된다는 현실적 가정 (약 5~10%)
+    const estImpressions = Math.floor(totalCnt * (device === 'mobile' ? 0.08 : 0.04));
 
-    // 연관 키워드
+    // 경쟁강도 레이블 현실화
+    const getCompLabel = (idx, total) => {
+      if (idx === 'high' && total > 40000) return '레드오션(치열)';
+      if (idx === 'high') return '높음';
+      if (idx === 'mid') return '보통';
+      return '틈새시장(낮음)';
+    };
+
+    // --- [연관 키워드 처리] ---
     const related = kwList.slice(0, 10).map(k => {
       const kComp = k.compIdx || 'mid';
+      const kTotal = (parseInt(k.monthlyPcQcCnt) || 0) + (parseInt(k.monthlyMobileQcCnt) || 0);
       const kRange = cpcRange[kComp] || cpcRange['mid'];
       const kDev = device === 'mobile' ? kRange.mobile : kRange.pc;
+      
+      // 연관 키워드에도 동일한 보정 적용
+      const kCpc = getAdjustedCpc(k.relKeyword, kDev.avg, kComp, kTotal);
+      
       return {
         keyword: k.relKeyword,
         pcQcCnt: parseInt(k.monthlyPcQcCnt) || 0,
         mobileQcCnt: parseInt(k.monthlyMobileQcCnt) || 0,
-        cpcMin: kDev.min,
-        cpcMax: kDev.max,
-        cpcAvg: kDev.avg,
+        cpcMin: Math.floor(kCpc * 0.7),
+        cpcMax: Math.floor(kCpc * 1.5),
+        cpcAvg: kCpc,
         compIdx: kComp,
-        estClicks: Math.floor(budgetNum / kDev.avg),
+        compLabel: getCompLabel(kComp, kTotal),
+        estClicks: Math.floor(budgetNum / kCpc),
       };
     });
 
     return res.status(200).json({
-      keyword, device: device || 'pc', budget: budgetNum,
-      pcQcCnt: pcCnt, mobileQcCnt: mobCnt, totalQcCnt: totalCnt,
-      cpc, cpcMin: devRange.min, cpcMax: devRange.max,
-      estClicks, estImpressions, compIdx, related,
+      keyword,
+      device: device || 'pc',
+      budget: budgetNum,
+      pcQcCnt: pcCnt,
+      mobileQcCnt: mobCnt,
+      totalQcCnt: totalCnt,
+      cpc,
+      cpcMin: Math.floor(cpc * 0.8),
+      cpcMax: Math.floor(cpc * 1.3),
+      estClicks,
+      estImpressions,
+      compIdx: getCompLabel(compIdx, totalCnt),
+      related,
     });
 
-  } catch(e) {
+  } catch (e) {
     return res.status(200).json({ errorMessage: e.message });
   }
 };
