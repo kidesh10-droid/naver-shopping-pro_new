@@ -426,7 +426,8 @@ tr.mr td{background:#f0fdf6;}tr:hover td{background:#f9fafb;}tr.mr:hover td{back
       <input type="password" id="authPw" placeholder="비밀번호 입력" />
     </div>
     <button class="auth-btn" id="authBtn" onclick="doAuth()">로그인</button>
-    <div style="text-align:center;margin-top:12px;">
+    <div style="text-align:center;margin-top:12px;display:flex;justify-content:space-between;">
+      <span class="popup-close" id="forgotPwBtn" onclick="forgotPassword()" style="color:var(--blue)">비밀번호 찾기</span>
       <span class="popup-close" onclick="closeLoginPopup()">나중에 하기</span>
     </div>
   </div>
@@ -902,6 +903,22 @@ function en(id){document.getElementById(id).disabled=false;}
 function se(id,msg){const el=document.getElementById(id);el.textContent=msg;el.classList.add('on');}
 function he(id){document.getElementById(id).classList.remove('on');}
 function sl(ms){return new Promise(r=>setTimeout(r,ms));}
+
+// 비밀번호 찾기
+async function forgotPassword() {
+  const email = document.getElementById('authEmail').value.trim();
+  if (!email) { showAuthErr('이메일을 먼저 입력해주세요.'); return; }
+  try {
+    const res = await fetch('/api/auth?action=forgot', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    const data = await res.json();
+    if (data.error) { showAuthErr(data.error); return; }
+    showAuthErr('비밀번호 재설정 이메일을 발송했어요!', true);
+  } catch(e) { showAuthErr('오류: ' + e.message); }
+}
 
 // 초기화
 document.addEventListener('DOMContentLoaded', async () => {
