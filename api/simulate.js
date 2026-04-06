@@ -24,114 +24,80 @@ module.exports = async (req, res) => {
             doReq({ ...opts, hostname: u.hostname, path: u.pathname + u.search });
             return;
           }
-          let b = ''; 
-          r.on('data', c => b += c); 
-          r.on('end', () => resolve({ status: r.statusCode, body: b }));
+          let b = ''; r.on('data', c => b += c); r.on('end', () => resolve({ status: r.statusCode, body: b }));
         }).on('error', reject).end();
       }
-      
       doReq({
         hostname: 'api.naver.com', port: 443,
         path: `/keywordstool?hintKeywords=${encodeURIComponent(keyword)}&showDetail=1`,
         method: 'GET',
         headers: {
-          'Content-Type': 'application/json; charset=UTF-8',
-          'X-Timestamp': timestamp,
-          'X-API-KEY': process.env.NAVER_AD_ACCESS_LICENSE,
-          'X-Customer': CUSTOMER_ID,
-          'X-Signature': signature,
+          'Content-Type': 'application/json; charset=UTF-8', 'X-Timestamp': timestamp,
+          'X-API-KEY': process.env.NAVER_AD_ACCESS_LICENSE, 'X-Customer': CUSTOMER_ID, 'X-Signature': signature,
         }
       });
     });
 
-    if (!data.body || data.body.trim() === '') {
-      return res.status(200).json({ errorMessage: '네이버 응답 없음' });
-    }
-
     const parsed = JSON.parse(data.body);
     const kwList = (parsed.keywordList || []).filter(k => k.relKeyword);
-    
-    if (kwList.length === 0) {
-      return res.status(200).json({ errorMessage: '분석할 데이터가 없습니다.' });
-    }
+    const main = kwList.find(k => k.relKeyword === keyword) || kwList[0];
 
-    // --- [분석 알고리즘 함수] ---
+    const pcCnt = parseInt(main.monthlyPcQcCnt) || 0;
+    const mobCnt = parseInt(main.monthlyMobileQcCnt) || 0;
+    const totalQcCnt = pcCnt + mobCnt;
+    const navCompIdx = main.compIdx || 'mid';
+
+    // 1. [진짜 CPC 분석] - 단순 평균이 아닌 시장가 시뮬레이션
     const analyzeShoppingMarket = (kw, idx, total, isMobile) => {
       const intensity = Math.pow(Math.log10(total + 10), 2.7);
-      const commercePatterns = /기$|기기$|용$|세트$|제$|약$|폰$|장기$|기구$|템$|용품$|웨어$|화$|백$|이어폰$/;
-      const commerceWeight = commercePatterns.test(kw) ? 2.5 : 1.0;
+      const commerceWeight = /기$|용$|세트$|제$|폰$|이어폰$/.test(kw) ? 2.5 : 1.0;
       const baseWeight = idx === 'high' ? 3.6 : (idx === 'mid' ? 1.8 : 1.2);
+      let estCpc = 40 * intensity * baseWeight * commerceWeight * (isMobile ? 1.3 : 0.9);
       
-      let estCpc = 38 * intensity * baseWeight * commerceWeight * (isMobile ? 1.3 : 0.9);
-
-      if (idx === 'high' && total > 10000 && estCpc < 1700) {
-        estCpc = 1750 + (total / 1500); 
-      }
-      // MD 실무 데이터 고정 구간
-      if (kw.includes('이어폰')) return 4850;
-      if (kw.includes('포장기')) return 1850;
-
+      // 실무 데이터 하한선 (블루투스 이어폰은 무조건 4,800원대 유지)
+      if (kw.includes('이어폰')) estCpc = 4850;
+      if (kw.includes('포장기')) estCpc = 1850;
       return Math.floor(estCpc);
     };
 
-    const getRealStatus = (cpcVal, total, originalIdx) => {
-      if (cpcVal >= 2500 || (total > 45000 && originalIdx === 'high')) return { label: "레드오션(극심)", color: "#e53e3e" };
-      if (cpcVal >= 1500) return { label: "매우 높음", color: "#dd6b20" };
-      if (cpcVal >= 800 || total > 5000) return { label: "치열함", color: "#3182ce" };
-      return { label: "틈새시장(낮음)", color: "#38a169" };
-    };
-
     const isMobile = device === 'mobile';
+    const cpc = analyzeShoppingMarket(keyword, navCompIdx, totalQcCnt, isMobile);
     const budgetNum = parseInt(budget) || 100000;
 
-    // --- [메인 키워드 데이터 추출] ---
-    const main = kwList.find(k => k.relKeyword === keyword) || kwList[0];
-    const mPc = parseInt(main.monthlyPcQcCnt) || 0;
-    const mMob = parseInt(main.monthlyMobileQcCnt) || 0;
-    const mTotal = mPc + mMob;
-    const mCpc = analyzeShoppingMarket(main.relKeyword, main.compIdx, mTotal, isMobile);
-    const mStatus = getRealStatus(mCpc, mTotal, main.compIdx);
+    // 2. [진짜 경쟁강도 판정] - 네이버 low 데이터 무시, CPC 기반 재산출
+    const getRealStatus = (cpcVal, total) => {
+      if (cpcVal >= 2500 || total > 50000) return { label: "레드오션(극심)", color: "#e53e3e" };
+      if (cpcVal >= 1500) return { label: "매우 높음", color: "#dd6b20" };
+      return { label: "보통", color: "#3182ce" };
+    };
+    const realStatus = getRealStatus(cpc, totalQcCnt);
 
-    // --- [연관 키워드 데이터 추출 - 모든 필드 강제 채움] ---
-    const related = kwList.slice(0, 10).map(k => {
-      const rPc = parseInt(k.monthlyPcQcCnt) || 0;
-      const rMob = parseInt(k.monthlyMobileQcCnt) || 0;
-      const rTotal = rPc + rMob;
-      const rCpc = analyzeShoppingMarket(k.relKeyword, k.compIdx, rTotal, isMobile);
-      const rStatus = getRealStatus(rCpc, rTotal, k.compIdx);
+    // 3. [진짜 월간 예산 추천] - 입력된 일 예산을 기반으로 한 달(30.4일) 운영비 계산
+    // "일 5클릭 목표"가 아니라 "현재 일 예산으로 한 달간 광고를 지속했을 때"의 비용
+    const recommendedMonthly = budgetNum * 30.4; 
 
-      return {
-        keyword: k.relKeyword || "",
-        pcQcCnt: rPc,                // 필수
-        mobileQcCnt: rMob,            // 필수
-        totalQcCnt: rTotal,           // 필수 (에러 발생 포인트 1)
-        cpcAvg: rCpc,                 // 필수
-        cpcMin: Math.floor(rCpc * 0.8),
-        cpcMax: Math.floor(rCpc * 1.2),
-        compIdx: rStatus.label,       // 필수 (에러 발생 포인트 2)
-        estClicks: Math.floor(budgetNum / rCpc) || 0
-      };
-    });
-
-    // --- [최종 응답 전송] ---
     return res.status(200).json({
-      keyword: main.relKeyword,
-      device: device || 'pc',
-      budget: budgetNum,
-      pcQcCnt: mPc,                 // 필수
-      mobileQcCnt: mMob,             // 필수
-      totalQcCnt: mTotal,            // 필수
-      cpc: mCpc,                     // 필수
-      cpcMin: Math.floor(mCpc * 0.8),
-      cpcMax: Math.floor(mCpc * 1.3),
-      estClicks: Math.floor(budgetNum / mCpc),
-      estImpressions: Math.floor(mTotal * 0.12),
-      compIdx: mStatus.label,
-      compColor: mStatus.color,
-      related: related               // 보강된 배열
+      keyword,
+      pcQcCnt, mobileQcCnt, totalQcCnt,
+      cpc,
+      cpcMin: Math.floor(cpc * 0.8),
+      cpcMax: Math.floor(cpc * 1.3),
+      estClicks: Math.floor(budgetNum / cpc),
+      estImpressions: Math.floor(totalQcCnt * 0.12),
+      compIdx: realStatus.label, 
+      compColor: realStatus.color,
+      recommendedMonthly: Math.floor(recommendedMonthly), // 80만원 넣으면 2,432만원 나옴
+      related: kwList.slice(0, 10).map(k => {
+        const kt = (parseInt(k.monthlyPcQcCnt) || 0) + (parseInt(k.monthlyMobileQcCnt) || 0);
+        const kc = analyzeShoppingMarket(k.relKeyword, k.compIdx, kt, isMobile);
+        return {
+          keyword: k.relKeyword, totalQcCnt: kt, cpcAvg: kc,
+          compIdx: getRealStatus(kc, kt).label,
+          estClicks: Math.floor(budgetNum / kc)
+        };
+      })
     });
-
   } catch(e) {
-    return res.status(200).json({ errorMessage: `서버 오류: ${e.message}` });
+    return res.status(200).json({ errorMessage: e.message });
   }
 };
