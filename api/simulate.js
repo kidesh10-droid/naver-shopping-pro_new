@@ -19,7 +19,7 @@ module.exports = async (req, res) => {
     const data = await new Promise((resolve, reject) => {
       function doReq(opts) {
         https.request(opts, (r) => {
-          if ([301, 302, 308].includes(r.statusCode)) {
+          if ([301,302,308].includes(r.statusCode)) {
             const u = new URL(r.headers.location);
             doReq({ ...opts, hostname: u.hostname, path: u.pathname + u.search });
             return;
@@ -33,87 +33,64 @@ module.exports = async (req, res) => {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json; charset=UTF-8',
-          'X-Timestamp': timestamp, 'X-API-KEY': process.env.NAVER_AD_ACCESS_LICENSE,
-          'X-Customer': CUSTOMER_ID, 'X-Signature': signature,
+          'X-Timestamp': timestamp,
+          'X-API-KEY': process.env.NAVER_AD_ACCESS_LICENSE,
+          'X-Customer': CUSTOMER_ID,
+          'X-Signature': signature,
         }
       });
     });
 
+    if (!data.body || data.body.trim() === '') {
+      return res.status(200).json({ errorMessage: '데이터가 없습니다.' });
+    }
+
     const parsed = JSON.parse(data.body);
     const kwList = (parsed.keywordList || []).filter(k => k.relKeyword);
-    if (kwList.length === 0) return res.status(200).json({ errorMessage: '데이터가 없습니다.' });
+    const main = kwList.find(k => k.relKeyword === keyword) || kwList[0] || {};
 
-    const main = kwList.find(k => k.relKeyword === keyword) || kwList[0];
-    const pcQc = parseInt(main.monthlyPcQcCnt) || 0;
-    const mobQc = parseInt(main.monthlyMobileQcCnt) || 0;
-    const totalQc = pcQc + mobQc;
-    const isMobile = device === 'mobile';
+    const pcCnt = parseInt(main.monthlyPcQcCnt) || 0;
+    const mobCnt = parseInt(main.monthlyMobileQcCnt) || 0;
+    const totalCnt = pcCnt + mobCnt;
+    const compIdx = main.compIdx || 'mid';
+
+    // 경쟁강도 기반 예상 CPC 범위
+    const cpcRange = {
+      high:   { pc: { min: 800,  max: 3000, avg: 1500 }, mobile: { min: 400,  max: 1500, avg: 800  } },
+      mid:    { pc: { min: 300,  max: 800,  avg: 500  }, mobile: { min: 150,  max: 500,  avg: 300  } },
+      low:    { pc: { min: 50,   max: 300,  avg: 150  }, mobile: { min: 30,   max: 150,  avg: 80   } },
+    };
+    const range = cpcRange[compIdx] || cpcRange['mid'];
+    const devRange = device === 'mobile' ? range.mobile : range.pc;
+    const cpc = devRange.avg;
     const budgetNum = parseInt(budget) || 100000;
+    const estClicks = Math.floor(budgetNum / cpc);
+    const estImpressions = Math.floor(estClicks * (100 / (devRange.avg / 100)));
 
-    // --- [Gemini AI 실무 분석 로직] ---
-
-    // 1. 입찰가 추론 (네이버 '검색' 데이터 -> '쇼핑' 실전가로 변환)
-    const analyzeCpc = (kw, total) => {
-      const intensity = Math.pow(Math.log10(total + 10), 2.8); // 경쟁 밀도 지수
-      const isShopping = /기$|용$|폰$|장기$|기기$|웨어$|화$|백$/.test(kw);
-      let cpc = 45 * intensity * (isShopping ? 2.6 : 1.2) * (isMobile ? 1.25 : 0.9);
-      
-      // MD 데이터 기반 강제 하한선 보정
-      if (kw.includes('이어폰')) return 4850;
-      if (kw.includes('포장기')) return 1850;
-      return Math.floor(cpc);
-    };
-
-    const cpc = analyzeCpc(keyword, totalQc);
-
-    // 2. 예상 클릭수 분석 (단순 나눗셈이 아닌 '점유율' 기반 시뮬레이션)
-    // 예산이 많아도 검색량이 적으면 다 못 씁니다. 반대로 검색량이 많아도 예산이 적으면 조기 소진됩니다.
-    const analyzeClicks = (b, c, t) => {
-      const maxPossibleClicks = t * 0.05; // 전체 검색량의 5%를 최대 클릭 가능치로 설정(실무적 상한선)
-      const budgetClicks = b / c;
-      return Math.floor(Math.min(maxPossibleClicks, budgetClicks));
-    };
-
-    const estClicks = analyzeClicks(budgetNum, cpc, totalQc);
-
-    // 3. 월간 예산 추천 (0원 에러 해결 및 지능형 추천)
-    // 1페이지 상위 노출을 유지하기 위한 '적정 월간 비용'을 제안
-    const recommendedMonthly = Math.floor(cpc * (totalQc * 0.03)); 
-
-    // 4. 경쟁강도 판정
-    const getStatus = (c, t) => {
-      if (c >= 2500 || t > 40000) return { label: "레드오션(극심)", color: "#e53e3e" };
-      if (c >= 1200) return { label: "매우 높음", color: "#dd6b20" };
-      return { label: "보통", color: "#3182ce" };
-    };
-    const status = getStatus(cpc, totalQc);
+    // 연관 키워드
+    const related = kwList.slice(0, 10).map(k => {
+      const kComp = k.compIdx || 'mid';
+      const kRange = cpcRange[kComp] || cpcRange['mid'];
+      const kDev = device === 'mobile' ? kRange.mobile : kRange.pc;
+      return {
+        keyword: k.relKeyword,
+        pcQcCnt: parseInt(k.monthlyPcQcCnt) || 0,
+        mobileQcCnt: parseInt(k.monthlyMobileQcCnt) || 0,
+        cpcMin: kDev.min,
+        cpcMax: kDev.max,
+        cpcAvg: kDev.avg,
+        compIdx: kComp,
+        estClicks: Math.floor(budgetNum / kDev.avg),
+      };
+    });
 
     return res.status(200).json({
-      keyword,
-      pcQcCnt: pcQc,
-      mobileQcCnt: mobQc,
-      totalQcCnt: totalQc,
-      cpc,
-      cpcMin: Math.floor(cpc * 0.8),
-      cpcMax: Math.floor(cpc * 1.3),
-      estClicks: estClicks, // AI가 분석한 현실적 클릭수
-      estImpressions: Math.floor(totalQc * 0.15),
-      compIdx: status.label,
-      compColor: status.color,
-      recommendedMonthly: recommendedMonthly, // 0원 에러 해결
-      budget: budgetNum,
-      related: kwList.slice(0, 10).map(k => {
-        const kt = (parseInt(k.monthlyPcQcCnt) || 0) + (parseInt(k.monthlyMobileQcCnt) || 0);
-        const kc = analyzeCpc(k.relKeyword, kt);
-        return {
-          keyword: k.relKeyword,
-          totalQcCnt: kt,
-          cpcAvg: kc,
-          compIdx: getStatus(kc, kt).label,
-          estClicks: analyzeClicks(budgetNum, kc, kt)
-        };
-      })
+      keyword, device: device || 'pc', budget: budgetNum,
+      pcQcCnt: pcCnt, mobileQcCnt: mobCnt, totalQcCnt: totalCnt,
+      cpc, cpcMin: devRange.min, cpcMax: devRange.max,
+      estClicks, estImpressions, compIdx, related,
     });
+
   } catch(e) {
     return res.status(200).json({ errorMessage: e.message });
   }
