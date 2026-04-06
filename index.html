@@ -536,7 +536,8 @@ function updateUsageUI() {
     const guestCount = parseInt(localStorage.getItem('guestUsage')||'0');
     const remaining = Math.max(0, 3 - guestCount);
     badge.className = 'usage-badge' + (remaining <= 1 ? (remaining === 0 ? ' empty' : ' low') : '');
-    badge.textContent = `무료 체험: ${remaining}회 남음`;
+    badge.textContent = '🎉 베타 무료 이용 중';
+    badge.className = 'usage-badge';
   }
 }
 
@@ -549,37 +550,9 @@ function showAuthErr(msg, success=false) {
   el.classList.add('on');
 }
 
-// 사용 횟수 체크
+// 사용 횟수 체크 (베타 테스트 기간 - 전체 무료)
 async function checkUsage() {
-  // 베타 테스트 기간 - 전체 무료
   return true;
-}
-  if (!token) {
-    // 비회원 - localStorage 체크
-    const guestCount = parseInt(localStorage.getItem('guestUsage')||'0');
-    if (guestCount >= 3) {
-      // 로그인 팝업 먼저
-      document.getElementById('loginPopupTitle').textContent = '회원가입하고 더 사용하세요!';
-      document.getElementById('loginPopupDesc').textContent = '회원가입하면 매월 10회 무료 사용! 프리미엄은 무제한이에요.';
-      document.getElementById('loginPopup').classList.add('on');
-      return false;
-    }
-    localStorage.setItem('guestUsage', guestCount + 1);
-    updateUsageUI();
-    return true;
-  }
-  // 회원
-  try {
-    const res = await fetch('/api/auth?action=check_usage', { headers: { 'Authorization': `Bearer ${token}` } });
-    const data = await res.json();
-    if (!data.allowed) {
-      document.getElementById('payPopup').classList.add('on');
-      return false;
-    }
-    usageCount = data.usage;
-    updateUsageUI();
-    return true;
-  } catch(e) { return false; }
 }
 
 function openNaverPay() {
