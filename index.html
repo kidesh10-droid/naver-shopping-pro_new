@@ -221,13 +221,13 @@ tr.mr td{background:#f0fdf6;}tr:hover td{background:#f9fafb;}tr.mr:hover td{back
 </div>
 
 <div class="tabs">
-  <button class="tab" onclick="sw('rank')">🏆 순위 확인</button>
+  <button class="tab active" onclick="sw('rank')">🏆 순위 확인</button>
   <button class="tab" onclick="sw('kw')">🔍 키워드 분석</button>
   <button class="tab" onclick="sw('hot')">🔥 급상승 키워드</button>
-  <button class="tab active" onclick="sw('sim')">💰 광고 시뮬레이터</button>
+  <button class="tab" onclick="sw('sim')">💰 광고 시뮬레이터</button>
 </div>
 
-<div class="tc" id="tc-rank">
+<div class="tc on" id="tc-rank">
   <div class="card">
     <div class="row">
       <div class="iw"><span class="il">검색 키워드</span><input type="text" id="kw" placeholder="예: 블루투스 이어폰" /></div>
@@ -348,23 +348,22 @@ tr.mr td{background:#f0fdf6;}tr:hover td{background:#f9fafb;}tr.mr:hover td{back
   </div>
 </div>
 
-<div class="tc on" id="tc-sim">
+<div class="tc" id="tc-sim">
   <div class="card">
     <div class="row">
       <div class="iw"><span class="il">키워드</span><input type="text" id="sKw" placeholder="예: 블루투스 이어폰" /></div>
-      <div class="iw"><span class="il">일 예산 (원)</span><input type="number" id="sBudget" value="100000" /></div>
-      <div class="iw"><span class="il">희망 입찰가 (원)</span><input type="number" id="sBid" placeholder="미입력 시 평균가 적용" /></div>
+      <div class="iw"><span class="il">일 예산 (원)</span><input type="number" id="sBudget" placeholder="예: 100000" value="100000" /></div>
     </div>
     <div class="opts">
       <div class="ow"><span class="il">디바이스</span>
-        <select id="sDev"><option value="pc">PC</option><option value="mobile" selected>모바일</option></select>
+        <select id="sDev"><option value="pc" selected>PC</option><option value="mobile">모바일</option></select>
       </div>
       <button class="btn bp" id="btnS" onclick="startSim()">시뮬레이션</button>
     </div>
   </div>
   <div class="err" id="sErr"></div>
   <div class="prog" id="sProg">
-    <div class="ph"><div class="spin"></div><div><div class="pt">Gemini AI 분석 중...</div><div class="ps">입찰가 및 예상 순위 계산 중</div></div></div>
+    <div class="ph"><div class="spin"></div><div><div class="pt">광고 데이터 분석 중...</div><div class="ps">입찰가 및 예상 성과 계산 중</div></div></div>
   </div>
   <div class="sr" id="sRes">
     <div class="sim-grid" id="simGrid"></div>
@@ -375,15 +374,490 @@ tr.mr td{background:#f0fdf6;}tr:hover td{background:#f9fafb;}tr.mr:hover td{back
 </div>
 </div>
 
+<div class="overlay" id="loginPopup">
+  <div class="popup">
+    <div class="popup-icon">👋</div>
+    <div class="popup-title" id="loginPopupTitle">더 많이 사용하려면 회원가입하세요</div>
+    <div class="popup-desc" id="loginPopupDesc">회원가입하면 매월 10회 무료로 사용할 수 있어요!</div>
+    <div class="auth-tabs" style="margin-bottom:20px;">
+      <button class="auth-tab active" onclick="authTab('login')">로그인</button>
+      <button class="auth-tab" onclick="authTab('signup')">회원가입</button>
+    </div>
+    <div class="auth-err" id="authErr"></div>
+    <div class="auth-field">
+      <label>이메일</label>
+      <input type="text" id="authEmail" placeholder="이메일 주소 입력" />
+    </div>
+    <div class="auth-field">
+      <label>비밀번호</label>
+      <input type="password" id="authPw" placeholder="비밀번호 입력" />
+    </div>
+    <button class="auth-btn" id="authBtn" onclick="doAuth()">로그인</button>
+    <div style="text-align:center;margin-top:12px;display:flex;justify-content:space-between;">
+      <span class="popup-close" id="forgotPwBtn" onclick="forgotPassword()" style="color:var(--blue)">비밀번호 찾기</span>
+      <span class="popup-close" onclick="closeLoginPopup()">나중에 하기</span>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="payPopup">
+  <div class="popup">
+    <div class="popup-icon">🎁</div>
+    <div class="popup-title">무료 이용 횟수를 모두 사용했어요</div>
+    <div class="popup-desc">계속 이용하시려면 네이버페이 포인트를 선물해주세요.<br>확인 후 30일 무제한 이용권을 드립니다!</div>
+    <div class="popup-box">
+      <p>💰 이용권 금액</p>
+      <strong>월 5,000원 (30일 무제한)</strong>
+      <p style="margin-top:12px">📱 네이버페이 선물 계정</p>
+      <strong>kidesh</strong>
+      <p style="margin-top:12px;font-size:12px;color:var(--t3)">선물 후 이메일 주소를 kidesh@naver.com으로 알려주시면<br>24시간 내 승인해드립니다.</p>
+    </div>
+    <button class="popup-btn" onclick="openNaverPay()">네이버페이로 선물하기 →</button>
+    <span class="popup-close" onclick="closePopup()">나중에 하기</span>
+  </div>
+</div>
+
 <script>
 let token = localStorage.getItem('token');
 let userInfo = null;
 let chartInst = null, hChartInst = null;
 let curKw = '', curPeriod = '1year', curUnit = 'month';
 let curCat = '50000000', curCatName = '전체';
+let authMode = 'login';
 let usageCount = 0;
 
+// ===== 인증 =====
+function authTab(mode) {
+  authMode = mode;
+  document.querySelectorAll('.auth-tab').forEach((t,i) => t.classList.toggle('active', (mode==='login'&&i===0)||(mode==='signup'&&i===1)));
+  document.getElementById('authBtn').textContent = mode === 'login' ? '로그인' : '회원가입';
+}
+
+async function doAuth() {
+  const email = document.getElementById('authEmail').value.trim();
+  const pw = document.getElementById('authPw').value.trim();
+  if (!email || !pw) { showAuthErr('이메일과 비밀번호를 입력해주세요.'); return; }
+  document.getElementById('authBtn').textContent = '처리 중...';
+  document.getElementById('authBtn').disabled = true;
+  try {
+    const res = await fetch(`/api/auth?action=${authMode}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: pw })
+    });
+    const data = await res.json();
+    if (data.error) { showAuthErr(data.error); return; }
+    if (authMode === 'login') {
+      token = data.session.access_token;
+      localStorage.setItem('token', token);
+      // 비회원 사용 횟수 초기화
+      localStorage.removeItem('guestUsage');
+      await loadUser();
+      showMain();
+    } else {
+      showAuthErr('회원가입 완료! 이메일 인증 후 로그인해주세요.', true);
+    }
+  } catch(e) { showAuthErr('오류: ' + e.message); }
+  finally {
+    document.getElementById('authBtn').textContent = authMode === 'login' ? '로그인' : '회원가입';
+    document.getElementById('authBtn').disabled = false;
+  }
+}
+
+async function loadUser() {
+  if (!token) return;
+  try {
+    const res = await fetch('/api/auth?action=me', { headers: { 'Authorization': `Bearer ${token}` } });
+    const data = await res.json();
+    if (data.error) { doLogout(); return; }
+    userInfo = data.user;
+    usageCount = data.user.usage_count || 0;
+    updateUsageUI();
+  } catch(e) { doLogout(); }
+}
+
+function updateUserUI() {
+  if (!userInfo) return;
+  document.getElementById('userEmail').textContent = userInfo.email;
+  const remaining = userInfo.is_premium ? '∞' : Math.max(0, 3 - usageCount);
+  const badge = document.getElementById('usageBadge');
+  if (userInfo.is_premium) {
+    badge.className = 'premium-badge';
+    badge.textContent = '⭐ 프리미엄';
+  } else {
+    badge.className = 'usage-badge' + (remaining <= 1 ? (remaining === 0 ? ' empty' : ' low') : '');
+    badge.textContent = `남은 횟수: ${remaining}회`;
+  }
+}
+
+function showMain() {
+  closeLoginPopup();
+  updateUsageUI();
+}
+
+function showLoginPopup() {
+  document.getElementById('loginPopup').classList.add('on');
+}
+
+function closeLoginPopup() {
+  document.getElementById('loginPopup').classList.remove('on');
+}
+
+function doLogout() {
+  localStorage.removeItem('token');
+  token = null; userInfo = null;
+  document.getElementById('loginBtn').textContent = '로그인 / 회원가입';
+  updateUsageUI();
+}
+
+function updateUsageUI() {
+  const badge = document.getElementById('usageBadge');
+  const loginBtn = document.getElementById('loginBtn');
+  if (userInfo) {
+    loginBtn.textContent = userInfo.email.split('@')[0];
+    if (userInfo.is_premium) {
+      badge.className = 'premium-badge';
+      badge.textContent = '⭐ 프리미엄';
+    } else {
+      const remaining = Math.max(0, 10 - (userInfo.usage_count||0));
+      badge.className = 'usage-badge' + (remaining <= 2 ? (remaining === 0 ? ' empty' : ' low') : '');
+      badge.textContent = `남은 횟수: ${remaining}회`;
+    }
+  } else {
+    // 비회원 - localStorage 기반
+    const guestCount = parseInt(localStorage.getItem('guestUsage')||'0');
+    const remaining = Math.max(0, 3 - guestCount);
+    badge.className = 'usage-badge' + (remaining <= 1 ? (remaining === 0 ? ' empty' : ' low') : '');
+    badge.textContent = '🎉 베타 무료 이용 중';
+    badge.className = 'usage-badge';
+  }
+}
+
+function showAuthErr(msg, success=false) {
+  const el = document.getElementById('authErr');
+  el.textContent = msg;
+  el.style.background = success ? '#f0fdf4' : '#fef2f2';
+  el.style.borderColor = success ? '#a7f0c5' : '#fecaca';
+  el.style.color = success ? '#0a6b2e' : '#b91c1c';
+  el.classList.add('on');
+}
+
+// 사용 횟수 체크 (베타 테스트 기간 - 전체 무료)
+async function checkUsage() {
+  return true;
+}
+
+function openNaverPay() {
+  window.open('https://pay.naver.com/send', '_blank');
+}
+
+function closePopup() {
+  document.getElementById('payPopup').classList.remove('on');
+}
+
+// ===== 탭 전환 =====
+function sw(t) {
+  ['rank','kw','hot','sim'].forEach((id,i) => {
+    document.querySelectorAll('.tab')[i].classList.toggle('active', t===id);
+    document.getElementById('tc-'+id).classList.toggle('on', t===id);
+  });
+}
+
+// ===== 순위 확인 =====
+async function startRank() {
+  const kw=v('kw'), pn=v('pn'), maxR=parseInt(v('mxr')), srt=v('srt'), flt=v('flt');
+  if (!kw) { se('rErr','검색 키워드를 입력해주세요.'); return; }
+  if (!pn) { se('rErr','찾을 상품명을 입력해주세요.'); return; }
+  if (!await checkUsage()) return;
+  he('rErr'); sh('rProg'); hi('rRes'); dis('btnR');
+  const total=Math.ceil(maxR/100); const items=[]; let found=null, fRank=null;
+  try {
+    for (let p=0; p<total; p++) {
+      const start=p*100+1, display=Math.min(100,maxR-p*100);
+      st('pTxt',`${start}~${start+display-1}위 검색 중...`);
+      st('pSub',`${p+1} / ${total} 페이지`);
+      sw2('pBar',((p/total)*100)+'%');
+      document.getElementById('pSteps').innerHTML = Array.from({length:total},(_,i) => {
+        const c=i<p?'done':i===p?'cur':'';
+        return `<span class="step ${c}">${i*100+1}~${(i+1)*100}위</span>`;
+      }).join('');
+      const params = new URLSearchParams({query:kw,start,display,sort:srt,...(flt?{filter:flt}:{})});
+      const res = await fetch(`/api/search?${params}`);
+      const data = await res.json();
+      (data.items||[]).forEach((item,idx) => {
+        const rank=start+idx, name=item.title.replace(/<[^>]*>/g,'');
+        items.push({rank,name,price:parseInt(item.lprice||0).toLocaleString()+'원',mall:item.mallName||'-',review:item.reviewCount||0});
+        const n=s=>s.toLowerCase().replace(/\s/g,'');
+        if (!found && n(name).includes(n(pn))) { found=items[items.length-1]; fRank=rank; }
+      });
+      await sl(120);
+    }
+    sw2('pBar','100%'); st('pTxt','분석 완료!'); await sl(300);
+    hi('rProg'); renderRank(kw,pn,maxR,found,fRank,items);
+  } catch(e) { hi('rProg'); se('rErr','오류: '+e.message); }
+  finally { en('btnR'); }
+}
+
+function renderRank(kw,pn,maxR,found,fRank,items) {
+  const badge = found ? `<span class="badge hit">🎯 ${fRank}위 발견</span>` : `<span class="badge miss">${maxR}위 이내 없음</span>`;
+  const body = found
+    ? `<div><div class="bnum">${fRank}</div><div class="bnum-s">/ ${maxR}위 이내</div></div>
+       <div><div class="pnm">${found.name}</div><div class="ptags">
+       <span class="ptag pr">${found.price}</span><span class="ptag">${found.mall}</span>
+       ${found.review>0?`<span class="ptag">리뷰 ${parseInt(found.review).toLocaleString()}개</span>`:''}</div></div>`
+    : `<div class="nores"><div class="nores-i">📭</div><div class="nores-t">"${pn}" 상품을 찾지 못했습니다</div><div class="nores-d">${maxR}위 이내에 없습니다</div></div>`;
+  document.getElementById('rSum').innerHTML = `
+    <div class="rhd"><span class="rkw">키워드: <strong>${kw}</strong> · 상품: <strong>${pn}</strong></span>${badge}</div>
+    <div class="rbdy">${body}</div>`;
+  let show = items.slice(0,20);
+  if (found && fRank>20) show.push(found);
+  const rows = show.map(item => {
+    const isMe = found && item.rank===fRank;
+    const sep = (found&&fRank>20&&item.rank===found.rank) ? `<tr><td colspan="4" style="text-align:center;font-size:11px;color:var(--t3);padding:6px;">···· ${fRank-20}개 항목 생략 ····</td></tr>` : '';
+    const rc = item.rank===1?'rn r1':item.rank===2?'rn r2':item.rank===3?'rn r3':isMe?'rn me':'rn';
+    return `${sep}<tr class="${isMe?'mr':''}"><td><span class="${rc}">${item.rank}</span></td><td>${item.name}${isMe?'<span class="mel">내 상품</span>':''}</td><td style="font-size:12px;color:var(--t2)">${item.mall}</td><td class="prc">${item.price}</td></tr>`;
+  }).join('');
+  document.getElementById('topSec').innerHTML = `
+    <div class="sechd"><span class="sect">상위 목록</span><span class="secs">총 ${items.length}개 조회</span></div>
+    <table><thead><tr><th style="width:50px">순위</th><th>상품명</th><th style="width:110px">판매처</th><th style="width:90px">최저가</th></tr></thead><tbody>${rows}</tbody></table>`;
+  document.getElementById('rFtr').textContent = `조회: ${new Date().toLocaleString('ko-KR')}`;
+  sh('rRes');
+}
+
+// ===== 키워드 분석 =====
+async function startKw() {
+  const kw = v('akw');
+  if (!kw) { se('kErr','키워드를 입력해주세요.'); return; }
+  if (!await checkUsage()) return;
+  he('kErr'); curKw=kw; curPeriod='1year'; curUnit='month';
+  document.querySelectorAll('.ptab').forEach((t,i)=>t.classList.toggle('active',i===2));
+  document.querySelectorAll('.utab').forEach((t,i)=>t.classList.toggle('active',i===2));
+  sh('kProg'); hi('kRes'); dis('btnK');
+  try {
+    const [kRes,dRes] = await Promise.all([
+      fetch(`/api/keyword?keyword=${enc(kw)}`),
+      fetch(`/api/datalab?keyword=${enc(kw)}&timeUnit=month&startDate=${gd(-1,'y')}&endDate=${gd(0)}`)
+    ]);
+    const kData=await kRes.json(), dData=await dRes.json();
+    hi('kProg'); renderKw(kw,kData,dData);
+    // 쿠팡 배너 링크 업데이트
+    document.getElementById('coupangBanner').href = `https://link.coupang.com/a/YOUR_LINK`;
+  } catch(e) { hi('kProg'); se('kErr','오류: '+e.message); }
+  finally { en('btnK'); }
+}
+
+async function chP(period,unit,el) {
+  if (!curKw) return;
+  curPeriod=period; curUnit=unit;
+  document.querySelectorAll('.ptab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  await loadChart(period,unit);
+}
+
+async function chU(unit,el) {
+  if (!curKw) return;
+  curUnit=unit;
+  document.querySelectorAll('.utab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  await loadChart(curPeriod,unit);
+}
+
+async function loadChart(period,unit) {
+  const sd = period==='1month'?gd(-1,'m'):period==='3month'?gd(-3,'m'):period==='3year'?gd(-3,'y'):gd(-1,'y');
+  try {
+    const res = await fetch(`/api/datalab?keyword=${enc(curKw)}&timeUnit=${unit}&startDate=${sd}&endDate=${gd(0)}`);
+    const data = await res.json();
+    if (data.results) renderChart(curKw,data);
+  } catch(e) { console.error(e); }
+}
+
+function renderKw(kw,kData,dData) {
+  const list = (kData.keyword?.keywordList||[]).filter(k=>k.monthlyPcQcCnt!==undefined);
+  const main = list.find(k=>k.relKeyword===kw)||list[0]||{};
+  const pc=parseInt(main.monthlyPcQcCnt)||0, mob=parseInt(main.monthlyMobileQcCnt)||0;
+  const total=pc+mob, ratio=total>0?Math.round((mob/total)*100):0;
+  const bidData = kData.bid;
+  const avgCpc = bidData&&Array.isArray(bidData)&&bidData[0] ? (bidData[0].avgMonthlyPcClkCost||0) : 0;
+  const compIdx = main.compIdx||'mid';
+
+  document.getElementById('kStats').innerHTML = `
+    <div class="ksc"><div class="ksl">월간 총 검색량</div><div class="ksv g">${total.toLocaleString()}</div><div class="kss">PC + 모바일</div></div>
+    <div class="ksc"><div class="ksl">모바일 비율</div><div class="ksv b">${ratio}%</div><div class="kss">모바일 ${mob.toLocaleString()}건</div></div>
+    <div class="ksc"><div class="ksl">평균 CPC</div><div class="ksv o">${avgCpc>0?avgCpc.toLocaleString()+'원':'-'}</div><div class="kss">PC 기준</div></div>
+    <div class="ksc"><div class="ksl">PC 검색량</div><div class="ksv p">${pc.toLocaleString()}</div><div class="kss">월간 기준</div></div>`;
+
+  const compVal=compIdx==='high'?85:compIdx==='mid'?50:20;
+  const compColor=compIdx==='high'?'#D84315':compIdx==='mid'?'#F59E0B':'#03C75A';
+  const compText=compIdx==='high'?'높음':compIdx==='mid'?'중간':'낮음';
+  document.getElementById('gaugeBar').style.cssText=`width:${compVal}%;background:${compColor};`;
+  document.getElementById('compBadge').innerHTML=`<span class="comp-badge" style="background:${compColor}20;color:${compColor};border:1px solid ${compColor}40">경쟁강도: ${compText}</span>`;
+
+  if (dData.results) renderChart(kw,dData);
+
+  if (bidData&&Array.isArray(bidData)&&bidData.length>0) {
+    const maxC=Math.max(...bidData.map(b=>b.avgMonthlyPcClkCost||0));
+    const rows=bidData.slice(0,10).map((b,i)=>{
+      const cpc=b.avgMonthlyPcClkCost||0, pct=maxC>0?Math.round((cpc/maxC)*100):0;
+      return `<tr><td>${i+1}위</td><td><div class="bid-bar"><div class="bid-bar-in" style="width:${pct}%;max-width:100px"></div><span style="font-size:12px;margin-left:4px">${cpc.toLocaleString()}원</span></div></td><td style="font-size:12px;color:var(--t2)">${(b.avgMonthlyPcImpCnt||0).toLocaleString()}</td><td style="font-size:12px;color:var(--t2)">${(b.avgMonthlyPcClkCnt||0).toLocaleString()}</td></tr>`;
+    }).join('');
+    document.getElementById('bidSec').innerHTML=`
+      <div class="sechd"><span class="sect">광고 입찰가 현황 (PC)</span><span class="secs">${kw} 기준</span></div>
+      <table><thead><tr><th>순위</th><th>평균 CPC</th><th>월 노출수</th><th>월 클릭수</th></tr></thead><tbody>${rows}</tbody></table>`;
+  }
+
+  const sorted=[...list].sort((a,b)=>(parseInt(b.monthlyMobileQcCnt)||0)+(parseInt(b.monthlyPcQcCnt)||0)-((parseInt(a.monthlyMobileQcCnt)||0)+(parseInt(a.monthlyPcQcCnt)||0)));
+  const maxT=sorted[0]?(parseInt(sorted[0].monthlyPcQcCnt)||0)+(parseInt(sorted[0].monthlyMobileQcCnt)||0):1;
+  document.getElementById('kwBody').innerHTML=sorted.slice(0,20).map(k=>{
+    const p=parseInt(k.monthlyPcQcCnt)||0,m=parseInt(k.monthlyMobileQcCnt)||0,t=p+m;
+    const pct=Math.round((t/maxT)*100);
+    const cl=k.compIdx==='high'?'#D84315':k.compIdx==='mid'?'#F59E0B':'#03C75A';
+    const cl2=k.compIdx==='high'?'높음':k.compIdx==='mid'?'중간':'낮음';
+    return `<tr><td style="font-weight:500">${k.relKeyword}</td><td>${p.toLocaleString()}</td><td>${m.toLocaleString()}</td><td style="font-weight:700">${t.toLocaleString()}</td>
+      <td><div class="compbar"><div class="compbar-in" style="width:${pct}%;max-width:80px;background:${cl}"></div><span class="complbl" style="color:${cl}">${cl2}</span></div></td></tr>`;
+  }).join('');
+  document.getElementById('kwSub').textContent=`${kw} 연관 키워드 ${Math.min(sorted.length,20)}개`;
+  sh('kRes');
+}
+
+function renderChart(kw,dData) {
+  st('cTitle',`"${kw}" 검색 트렌드`);
+  const pts=dData.results[0].data;
+  if (chartInst) chartInst.destroy();
+  chartInst=new Chart(document.getElementById('tChart').getContext('2d'),{
+    type:'line',
+    data:{labels:pts.map(p=>p.period),datasets:[{label:'트렌드 지수',data:pts.map(p=>p.ratio),borderColor:'#03C75A',backgroundColor:'rgba(3,199,90,0.08)',tension:0.4,fill:true,pointRadius:2,pointHoverRadius:5}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},tooltip:{callbacks:{label:c=>`트렌드 지수: ${c.raw}`}}},scales:{y:{beginAtZero:true,max:100}}}
+  });
+}
+
+// ===== 급상승 키워드 =====
+function selCat(cid,name,el) {
+  curCat=cid; curCatName=name;
+  document.querySelectorAll('.cat-btn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+}
+
+async function startHot() {
+  if (!await checkUsage()) return;
+  he('hErr'); sh('hProg'); hi('hRes'); dis('btnH');
+  const days=parseInt(v('hPeriod'));
+  const ed=gd(0), sd=gd(-days,'d');
+  const unit=days<=30?'date':'week';
+  try {
+    const res=await fetch(`/api/shopping?cid=${curCat}&startDate=${sd}&endDate=${ed}&timeUnit=${unit}`);
+    const data=await res.json();
+    hi('hProg');
+    if (data.errorMessage) throw new Error(data.errorMessage);
+    renderHot(data);
+  } catch(e) { hi('hProg'); se('hErr','오류: '+e.message); }
+  finally { en('btnH'); }
+}
+
+function renderHot(data) {
+  st('hTitle',`${curCatName} 쇼핑 트렌드`);
+  const results=data.results||[];
+  if (results.length>0) {
+    const pts=results[0].data||[];
+    if (hChartInst) hChartInst.destroy();
+    hChartInst=new Chart(document.getElementById('hChart').getContext('2d'),{
+      type:'line',
+      data:{labels:pts.map(p=>p.period.slice(5)||p.period),datasets:[{label:'쇼핑 트렌드 지수',data:pts.map(p=>p.ratio),borderColor:'#F57C00',backgroundColor:'rgba(245,124,0,0.08)',tension:0.4,fill:true,pointRadius:2,pointHoverRadius:5}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'}},scales:{y:{beginAtZero:true,max:100}}}
+    });
+    const recent=pts.slice(-10).reverse();
+    document.getElementById('hSec').innerHTML=`
+      <div class="sechd"><span class="sect">${curCatName} 트렌드 데이터</span><span class="secs">최근 데이터</span></div>
+      <table><thead><tr><th>날짜</th><th>트렌드 지수</th><th>변화</th></tr></thead>
+      <tbody>${recent.map((p,i,arr)=>{
+        const prev=arr[i+1];
+        const diff=prev?Math.round((p.ratio-prev.ratio)*10)/10:null;
+        const chg=diff===null?'':diff>0?`<span style="color:#D84315;font-weight:700">▲ ${diff}</span>`:diff<0?`<span style="color:var(--blue);font-weight:700">▼ ${Math.abs(diff)}</span>`:'<span style="color:var(--t3)">-</span>';
+        return `<tr><td>${p.period}</td><td style="font-weight:700">${p.ratio}</td><td>${chg}</td></tr>`;
+      }).join('')}</tbody></table>`;
+  }
+  sh('hRes');
+}
+
+// ===== 광고 시뮬레이터 =====
+async function startSim() {
+  const kw=v('sKw'), budget=parseInt(v('sBudget')), dev=v('sDev');
+  if (!kw) { se('sErr','키워드를 입력해주세요.'); return; }
+  if (!budget||budget<=0) { se('sErr','예산을 입력해주세요.'); return; }
+  if (!await checkUsage()) return;
+  he('sErr'); sh('sProg'); hi('sRes'); dis('btnS');
+  try {
+    const res=await fetch(`/api/simulate?keyword=${enc(kw)}&budget=${budget}&device=${dev}`);
+    const text=await res.text();
+    hi('sProg');
+    if(!text||text.trim()===''){throw new Error('응답이 비어있습니다. 광고 API 키를 확인해주세요.');}
+    let data;
+    try{data=JSON.parse(text);}catch(e){throw new Error('응답 파싱 오류: '+text.slice(0,100));}
+    if(data&&data.errorMessage)throw new Error(data.errorMessage);
+    renderSim(kw,budget,dev,data);
+  } catch(e) { hi('sProg'); se('sErr','오류: '+e.message); }
+  finally { en('btnS'); }
+}
+
+function renderSim(kw,budget,dev,data) {
+  if (data.errorMessage) { se('sErr', data.errorMessage); return; }
+
+  // [수정] 서버에서 보낸 색상/텍스트를 우선적으로 사용 (한글 경쟁강도 대응)
+  const compColor = data.compColor || (data.compIdx === '레드오션(극심)' ? '#e53e3e' : '#F59E0B');
+  const compText = data.compIdx || '보통';
+
+  document.getElementById('simGrid').innerHTML = `
+    <div class="sim-card"><div class="sim-icon">🔍</div><div class="sim-lbl">월간 총 검색량</div><div class="sim-val g">${(data.totalQcCnt || 0).toLocaleString()}</div><div class="sim-sub">PC ${(data.pcQcCnt || 0).toLocaleString()} + 모바일 ${(data.mobileQcCnt || 0).toLocaleString()}</div></div>
+    <div class="sim-card"><div class="sim-icon">💰</div><div class="sim-lbl">예상 평균 CPC</div><div class="sim-val o">${(data.cpc || 0).toLocaleString()}원</div><div class="sim-sub">${(data.cpcMin || 0).toLocaleString()}~${(data.cpcMax || 0).toLocaleString()}원 범위</div></div>
+    <div class="sim-card"><div class="sim-icon">👆</div><div class="sim-lbl">예상 일 클릭수</div><div class="sim-val b">${(data.estClicks || 0).toLocaleString()}</div><div class="sim-sub">일 예산 ${budget.toLocaleString()}원 기준</div></div>
+    <div class="sim-card"><div class="sim-icon">📊</div><div class="sim-lbl">광고 경쟁강도</div><div class="sim-val" style="color:${compColor}">${compText}</div><div class="sim-sub">${kw} 기준</div></div>
+    <div class="sim-card"><div class="sim-icon">👁️</div><div class="sim-lbl">예상 노출수</div><div class="sim-val p">${(data.estImpressions || 0).toLocaleString()}</div><div class="sim-sub">${dev === 'mobile' ? '모바일' : 'PC'} 기준</div></div>
+    <div class="sim-card">
+        <div class="sim-icon">📈</div>
+        <div class="sim-lbl">월간 예산 추천</div>
+        <div class="sim-val" style="color:var(--purple)">${(data.recommendedMonthly || 0).toLocaleString()}원~</div>
+        <div class="sim-sub">현재 일 예산(${budget.toLocaleString()}원) 한 달 기준</div>
+    </div>`;
+
+  const maxCpc = Math.max(...(data.related || []).map(r => r.cpcAvg || 0));
+  const rows = (data.related || []).map(r => {
+    const total = (r.pcQcCnt || 0) + (r.mobileQcCnt || 0);
+    const pct = maxCpc > 0 ? Math.round((r.cpcAvg / maxCpc) * 100) : 0;
+    
+    // 연관 키워드 경쟁강도 색상 처리 (서버 한글 데이터 기반)
+    let cl = '#38a169'; 
+    if(r.compIdx === '레드오션(극심)') cl = '#e53e3e';
+    else if(r.compIdx === '매우 높음') cl = '#dd6b20';
+    else if(r.compIdx === '치열함') cl = '#3182ce';
+
+    return `<tr>
+      <td style="font-weight:500">${r.keyword}</td>
+      <td>${(r.totalQcCnt || total || 0).toLocaleString()}</td>
+      <td><div class="bid-bar"><div class="bid-bar-in" style="width:${pct}%;max-width:80px;background:var(--blue)"></div><span style="font-size:12px;margin-left:4px">${(r.cpcAvg || 0).toLocaleString()}원</span></div></td>
+      <td style="font-weight:700;color:var(--green)">${(r.estClicks || 0).toLocaleString()}회</td>
+      <td><span style="color:${cl};font-weight:700">${r.compIdx}</span></td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('simSec').innerHTML = `
+    <div class="sechd">
+      <span class="sect">연관 키워드 입찰가 분석</span>
+      <span class="secs">일 예산 ${budget.toLocaleString()}원 기준 · 실무 쇼핑 데이터 기반</span>
+    </div>
+    <div style="padding:10px 18px;font-size:12px;color:var(--t3);border-bottom:1px solid var(--bd);">⚠️ 본 수치는 검색량과 카테고리 성격을 분석한 추정치로 실무 가이드용입니다.</div>
+    <table><thead><tr><th>키워드</th><th>월간 검색량</th><th>예상 CPC</th><th>예상 일 클릭</th><th>경쟁도</th></tr></thead>
+    <tbody>${rows}</tbody></table>`;
+
+  sh('sRes');
+}
+
 // 유틸
+function gd(offset=0,unit='y'){
+  const d=new Date();
+  if(unit==='y')d.setFullYear(d.getFullYear()+offset);
+  else if(unit==='m')d.setMonth(d.getMonth()+offset);
+  else if(unit==='d')d.setDate(d.getDate()+offset);
+  return d.toISOString().slice(0,10);
+}
 function v(id){return document.getElementById(id).value.trim();}
 function enc(s){return encodeURIComponent(s);}
 function sh(id){document.getElementById(id).classList.add('on');}
@@ -396,67 +870,36 @@ function se(id,msg){const el=document.getElementById(id);el.textContent=msg;el.c
 function he(id){document.getElementById(id).classList.remove('on');}
 function sl(ms){return new Promise(r=>setTimeout(r,ms));}
 
-// 탭 전환 (통합 버전)
-function sw(t) {
-  ['rank','kw','hot','sim'].forEach((id) => {
-    const btn = document.querySelector(`.tab[onclick="sw('${id}')"]`);
-    const content = document.getElementById('tc-' + id);
-    if(btn) btn.classList.toggle('active', t === id);
-    if(content) content.classList.toggle('on', t === id);
-  });
-}
-
-// ===== 광고 시뮬레이터 (MD 특화 버전) =====
-async function startSim() {
-  const kw = v('sKw'), budget = v('sBudget'), dev = v('sDev'), bid = v('sBid');
-  if (!kw) { se('sErr','키워드를 입력해주세요.'); return; }
-  
-  he('sErr'); sh('sProg'); hi('sRes'); dis('btnS');
+// 비밀번호 찾기
+async function forgotPassword() {
+  const email = document.getElementById('authEmail').value.trim();
+  if (!email) { showAuthErr('이메일을 먼저 입력해주세요.'); return; }
   try {
-    const res = await fetch(`/api/simulate?keyword=${enc(kw)}&budget=${budget}&device=${dev}&bid=${bid}`);
+    const res = await fetch('/api/auth?action=forgot', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
     const data = await res.json();
-    hi('sProg');
-    if(data.errorMessage) throw new Error(data.errorMessage);
-    renderSim(kw, budget, data);
-  } catch(e) { hi('sProg'); se('sErr','오류: '+e.message); }
-  finally { en('btnS'); }
+    if (data.error) { showAuthErr(data.error); return; }
+    showAuthErr('비밀번호 재설정 이메일을 발송했어요!', true);
+  } catch(e) { showAuthErr('오류: ' + e.message); }
 }
 
-function renderSim(kw, budget, data) {
-  document.getElementById('simGrid').innerHTML = `
-    <div class="sim-card"><div class="sim-icon">🔍</div><div class="sim-lbl">월간 총 검색량</div><div class="sim-val g">${(data.totalQcCnt || 0).toLocaleString()}</div><div class="sim-sub">PC ${(data.pcQcCnt || 0).toLocaleString()} + 모바일 ${(data.mobileQcCnt || 0).toLocaleString()}</div></div>
-    <div class="sim-card"><div class="sim-icon">💰</div><div class="sim-lbl">적용 입찰가(CPC)</div><div class="sim-val o">${(data.cpc || 0).toLocaleString()}원</div><div class="sim-sub">입력 또는 평균가</div></div>
-    <div class="sim-card"><div class="sim-icon">🏆</div><div class="sim-lbl">예상 평균 순위</div><div class="sim-val b" style="font-size:22px; color:var(--blue)">${data.estRank || '-'}</div><div class="sim-sub">입찰가 대비 순위 추정</div></div>
-    <div class="sim-card"><div class="sim-icon">👆</div><div class="sim-lbl">예상 일 클릭수</div><div class="sim-val b">${(data.estClicks || 0).toLocaleString()}</div><div class="sim-sub">일 예산 ${parseInt(budget).toLocaleString()}원 기준</div></div>
-    <div class="sim-card"><div class="sim-icon">👁️</div><div class="sim-lbl">예상 노출수</div><div class="sim-val p">${(data.estImpressions || 0).toLocaleString()}</div><div class="sim-sub">쇼핑 구좌 가중치 반영</div></div>
-    <div class="sim-card">
-        <div class="sim-icon">📈</div>
-        <div class="sim-lbl">월간 예산 추정</div>
-        <div class="sim-val" style="color:var(--purple)">${(data.recommendedMonthly || 0).toLocaleString()}원~</div>
-        <div class="sim-sub">한 달 운영 시 예상 비용</div>
-    </div>`;
+// 초기화
+document.addEventListener('DOMContentLoaded', async () => {
+  if (token) {
+    await loadUser();
+  }
+  updateUsageUI();
+});
 
-  const rows = (data.related || []).map(r => `
-    <tr>
-      <td style="font-weight:500">${r.keyword}</td>
-      <td>${(r.totalQcCnt || 0).toLocaleString()}</td>
-      <td style="font-weight:700; color:var(--blue)">${r.estRank || '-'}</td>
-      <td style="font-weight:700; color:var(--green)">${(r.cpcAvg || 0).toLocaleString()}원</td>
-      <td><span style="color:var(--red); font-weight:700">레드오션</span></td>
-    </tr>`).join('');
-
-  document.getElementById('simSec').innerHTML = `
-    <div class="sechd"><span class="sect">키워드별 실무 추정 데이터</span></div>
-    <table><thead><tr><th>키워드</th><th>월 검색량</th><th>예상 순위</th><th>평균 CPC</th><th>경쟁도</th></tr></thead>
-    <tbody>${rows}</tbody></table>`;
-  sh('sRes');
-}
-
-// 나머지 기능(순위 확인 등)은 이전과 동일하게 유지...
-async function startRank() { /* 기존 코드 유지 */ }
-async function startKw() { /* 기존 코드 유지 */ }
-async function startHot() { /* 기존 코드 유지 */ }
-// [중략 - 기존 스크립트 로직들 그대로 붙여넣기]
+document.getElementById('kw').addEventListener('keydown',e=>{if(e.key==='Enter')startRank();});
+document.getElementById('pn').addEventListener('keydown',e=>{if(e.key==='Enter')startRank();});
+document.getElementById('akw').addEventListener('keydown',e=>{if(e.key==='Enter')startKw();});
+document.getElementById('authEmail').addEventListener('keydown',e=>{if(e.key==='Enter')doAuth();});
+document.getElementById('authPw').addEventListener('keydown',e=>{if(e.key==='Enter')doAuth();});
+document.getElementById('sKw').addEventListener('keydown',e=>{if(e.key==='Enter')startSim();});
 </script>
 </body>
 </html>
