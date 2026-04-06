@@ -876,10 +876,10 @@ function renderSim(kw,budget,dev,data) {
 
   // AI 분석 코멘트
   if (data.aiComment) {
-    document.getElementById('aiComment').textContent = data.aiComment;
-    document.getElementById('aiAnalysis').style.display = 'block';
+    document.getElementById('aiAnalysisText').textContent = data.aiComment;
+    document.getElementById('aiSec').style.display = 'block';
   } else {
-    document.getElementById('aiAnalysis').style.display = 'none';
+    document.getElementById('aiSec').style.display = 'none';
   }
 
   // 연관 키워드 테이블
