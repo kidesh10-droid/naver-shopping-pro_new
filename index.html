@@ -19,6 +19,8 @@
 body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--t);min-height:100vh;}
 #mainScreen{display:block;padding:24px 16px;}
 .w{max-width:980px;margin:0 auto;}
+
+/* 헤더 & 배지 */
 .hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;}
 .hdr-left{display:flex;align-items:center;gap:12px;}
 .logo{width:44px;height:44px;background:var(--green);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;}
@@ -27,10 +29,14 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--t);m
 .hdr-right{display:flex;align-items:center;gap:10px;}
 .usage-badge{font-size:12px;padding:4px 10px;border-radius:20px;background:var(--gl);color:#0a6b2e;font-weight:500;}
 .logout-btn{font-size:13px;color:var(--t2);cursor:pointer;padding:4px 10px;border:1px solid var(--bd);border-radius:var(--rs);background:var(--card);}
+
+/* 탭 스타일 */
 .tabs{display:flex;gap:4px;margin-bottom:20px;background:var(--card);border:1px solid var(--bd);border-radius:var(--r);padding:4px;}
 .tab{flex:1;padding:11px;text-align:center;font-size:14px;font-weight:500;border-radius:var(--rs);cursor:pointer;color:var(--t2);border:none;background:none;font-family:'Noto Sans KR',sans-serif;transition:all .2s;}
 .tab.active{background:var(--green);color:#fff;}
 .tc{display:none;}.tc.on{display:block;}
+
+/* 공통 카드 & 입력창 */
 .card{background:var(--card);border:1px solid var(--bd);border-radius:var(--r);padding:20px;margin-bottom:16px;}
 .row{display:flex;gap:8px;margin-bottom:12px;}
 .iw{flex:1;display:flex;flex-direction:column;gap:4px;}
@@ -42,13 +48,9 @@ input:focus,select:focus{border-color:var(--green);background:#fff;}
 .bg{background:var(--green);color:#fff;}
 .bb{background:var(--blue);color:#fff;}
 .bp{background:var(--purple);color:#fff;}
-.err{background:#fef2f2;border:1px solid #fecaca;border-radius:var(--r);padding:14px 18px;font-size:13px;color:#b91c1c;margin-bottom:16px;display:none;}
-.err.on{display:block;}
-.prog{display:none;background:var(--card);border:1px solid var(--bd);border-radius:var(--r);padding:20px;margin-bottom:16px;}
-.prog.on{display:block;}
-.ph{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
-.spin{width:18px;height:18px;border:2.5px solid var(--gl);border-top-color:var(--green);border-radius:50%;animation:sp .8s linear infinite;flex-shrink:0;}
-@keyframes sp{to{transform:rotate(360deg);}}
+.bo{background:var(--orange);color:#fff;}
+
+/* 결과창 레이아웃 */
 .sim-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px;}
 .sim-card{background:var(--card);border:1px solid var(--bd);border-radius:var(--r);padding:18px;text-align:center;}
 .sim-icon{font-size:28px;margin-bottom:8px;}
@@ -56,12 +58,23 @@ input:focus,select:focus{border-color:var(--green);background:#fff;}
 .sim-val{font-size:24px;font-weight:700;}
 .sim-val.g{color:var(--green);}.sim-val.b{color:var(--blue);}.sim-val.o{color:var(--orange);}
 .sim-sub{font-size:11px;color:var(--t3);margin-top:4px;}
+
 .sec{background:var(--card);border:1px solid var(--bd);border-radius:var(--r);overflow:hidden;margin-bottom:16px;}
 .sechd{padding:12px 18px;border-bottom:1px solid var(--bd);background:#fafafa;display:flex;align-items:center;justify-content:space-between;}
 .sect{font-size:14px;font-weight:700;}
 table{width:100%;border-collapse:collapse;}
 th{font-size:11px;color:var(--t3);font-weight:500;padding:8px 18px;text-align:left;border-bottom:1px solid var(--bd);background:#fafafa;}
 td{padding:10px 18px;font-size:13px;border-bottom:1px solid var(--bd);}
+
+/* 로딩 애니메이션 */
+.prog{display:none;background:var(--card);border:1px solid var(--bd);border-radius:var(--r);padding:20px;margin-bottom:16px;}
+.prog.on{display:block;}
+.ph{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
+.spin{width:18px;height:18px;border:2.5px solid var(--gl);border-top-color:var(--green);border-radius:50%;animation:sp .8s linear infinite;}
+@keyframes sp{to{transform:rotate(360deg);}}
+.err{background:#fef2f2;border:1px solid #fecaca;border-radius:var(--r);padding:14px 18px;font-size:13px;color:#b91c1c;margin-bottom:16px;display:none;}
+.err.on{display:block;}
+
 @media(max-width:640px){ .row{flex-direction:column;} .sim-grid{grid-template-columns:repeat(2,1fr);} }
 </style>
 </head>
@@ -79,15 +92,35 @@ td{padding:10px 18px;font-size:13px;border-bottom:1px solid var(--bd);}
     </div>
     <div class="hdr-right">
       <span id="usageBadge" class="usage-badge">🎉 베타 무료 이용 중</span>
-      <button class="logout-btn" id="loginBtn">로그인 / 회원가입</button>
+      <button class="logout-btn">로그인 / 회원가입</button>
     </div>
   </div>
 
   <div class="tabs">
-    <button class="tab" onclick="sw('rank')">🏆 순위 확인</button>
-    <button class="tab" onclick="sw('kw')">🔍 키워드 분석</button>
-    <button class="tab" onclick="sw('hot')">🔥 급상승 키워드</button>
-    <button class="tab active" onclick="sw('sim')">💰 광고 시뮬레이터</button>
+    <button class="tab" id="tab-rank" onclick="sw('rank')">🏆 순위 확인</button>
+    <button class="tab" id="tab-kw" onclick="sw('kw')">🔍 키워드 분석</button>
+    <button class="tab" id="tab-hot" onclick="sw('hot')">🔥 급상승 키워드</button>
+    <button class="tab active" id="tab-sim" onclick="sw('sim')">💰 광고 시뮬레이터</button>
+  </div>
+
+  <div class="tc" id="tc-rank">
+    <div class="card">
+      <div class="row"><div class="iw"><span class="il">검색 키워드</span><input type="text" id="kw" placeholder="예: 진공포장기" /></div></div>
+      <button class="btn bg">준비 중...</button>
+    </div>
+  </div>
+
+  <div class="tc" id="tc-kw">
+    <div class="card">
+      <div class="row"><div class="iw"><span class="il">분석할 키워드</span><input type="text" id="akw" placeholder="예: 무선 이어폰" /></div></div>
+      <button class="btn bb">준비 중...</button>
+    </div>
+  </div>
+
+  <div class="tc" id="tc-hot">
+    <div class="card">
+      <button class="btn bo">준비 중...</button>
+    </div>
   </div>
 
   <div class="tc on" id="tc-sim">
@@ -98,17 +131,17 @@ td{padding:10px 18px;font-size:13px;border-bottom:1px solid var(--bd);}
         <div class="iw"><span class="il">희망 입찰가 (원)</span><input type="number" id="sBid" placeholder="미입력 시 평균가 적용" /></div>
       </div>
       <div class="opts">
-        <div class="ow"><span class="il">디바이스</span>
+        <div class="ow">
+          <span class="il">디바이스</span>
           <select id="sDev"><option value="pc">PC</option><option value="mobile" selected>모바일</option></select>
         </div>
-        <button class="btn bp" id="btnS" onclick="startSim()">시뮬레이션 시작</button>
+        <button class="btn bp" onclick="startSim()">시뮬레이션 시작</button>
       </div>
     </div>
 
     <div class="err" id="sErr"></div>
-    
     <div class="prog" id="sProg">
-      <div class="ph"><div class="spin"></div><div><div class="pt">Gemini AI 분석 중...</div><div class="ps">입찰가 대비 예상 순위 및 노출량 추정 중</div></div></div>
+      <div class="ph"><div class="spin"></div><div style="margin-left:10px">Gemini AI 분석 중...</div></div>
     </div>
 
     <div class="sr" id="sRes" style="display:none;">
@@ -120,72 +153,70 @@ td{padding:10px 18px;font-size:13px;border-bottom:1px solid var(--bd);}
 </div>
 
 <script>
-// 기본 유틸 함수
+// 유틸 함수
 function v(id){return document.getElementById(id).value.trim();}
 function enc(s){return encodeURIComponent(s);}
-function sh(id){document.getElementById(id).style.display = 'block';}
-function hi(id){document.getElementById(id).style.display = 'none';}
+
+// [수정] 탭 전환 함수 - 모든 탭 클릭 가능하게 복구
 function sw(t) {
-  ['rank','kw','hot','sim'].forEach((id) => {
-    document.getElementById('tc-'+id).classList.toggle('on', t===id);
-  });
+  // 1. 모든 탭 버튼에서 active 제거
+  document.querySelectorAll('.tab').forEach(btn => btn.classList.remove('active'));
+  // 2. 모든 탭 컨텐츠 숨기기
+  document.querySelectorAll('.tc').forEach(content => content.classList.remove('on'));
+  
+  // 3. 선택한 탭 활성화
+  document.getElementById('tab-' + t).classList.add('active');
+  document.getElementById('tc-' + t).classList.add('on');
 }
 
-// ===== 광고 시뮬레이터 로직 =====
+// 광고 시뮬레이터 로직
 async function startSim() {
   const kw = v('sKw'), budget = v('sBudget'), dev = v('sDev'), bid = v('sBid');
   if (!kw) { alert('키워드를 입력해주세요.'); return; }
   
   document.getElementById('sErr').style.display = 'none';
-  sh('sProg'); hi('sRes');
+  document.getElementById('sProg').style.display = 'block';
+  document.getElementById('sRes').style.display = 'none';
 
   try {
-    // API 호출 시 bid(입찰가) 파라미터 추가
     const res = await fetch(`/api/simulate?keyword=${enc(kw)}&budget=${budget}&device=${dev}&bid=${bid}`);
     const data = await res.json();
-    
     if (data.errorMessage) throw new Error(data.errorMessage);
-    
     renderSim(kw, budget, dev, data);
   } catch(e) { 
     const errEl = document.getElementById('sErr');
     errEl.textContent = '오류: ' + e.message;
     errEl.style.display = 'block';
   } finally { 
-    hi('sProg'); 
+    document.getElementById('sProg').style.display = 'none';
   }
 }
 
 function renderSim(kw, budget, dev, data) {
-  const compColor = data.compColor || '#e53e3e';
-
-  // [수정] 6칸 그리드: 검색량, 입찰가, 예상 순위, 클릭수, 노출수, 예산 추정
   document.getElementById('simGrid').innerHTML = `
-    <div class="sim-card"><div class="sim-icon">🔍</div><div class="sim-lbl">월간 총 검색량</div><div class="sim-val g">${(data.totalQcCnt || 0).toLocaleString()}</div><div class="sim-sub">쇼핑 수요 지수</div></div>
-    <div class="sim-card"><div class="sim-icon">💰</div><div class="sim-lbl">적용 입찰가(CPC)</div><div class="sim-val o">${(data.cpc || 0).toLocaleString()}원</div><div class="sim-sub">희망 또는 평균가</div></div>
-    <div class="sim-card"><div class="sim-icon">🏆</div><div class="sim-lbl">예상 평균 순위</div><div class="sim-val" style="color:var(--blue); font-size:22px;">${data.estRank || '분석 중'}</div><div class="sim-sub">현재 입찰가 기준</div></div>
-    <div class="sim-card"><div class="sim-icon">👆</div><div class="sim-lbl">예상 일 클릭수</div><div class="sim-val b">${(data.estClicks || 0).toLocaleString()}회</div><div class="sim-sub">일 예산 내 확보가능</div></div>
-    <div class="sim-card"><div class="sim-icon">👁️</div><div class="sim-lbl">예상 노출수</div><div class="sim-val p">${(data.estImpressions || 0).toLocaleString()}</div><div class="sim-sub">쇼핑 구좌 가중치 반영</div></div>
-    <div class="sim-card"><div class="sim-icon">📈</div><div class="sim-lbl">월간 예산 추정</div><div class="sim-val" style="color:var(--purple)">${(data.recommendedMonthly || 0).toLocaleString()}원~</div><div class="sim-sub">한 달 운영 시 예상 비용</div></div>
+    <div class="sim-card"><div class="sim-icon">🔍</div><div class="sim-lbl">월간 총 검색량</div><div class="sim-val g">${(data.totalQcCnt || 0).toLocaleString()}</div></div>
+    <div class="sim-card"><div class="sim-icon">💰</div><div class="sim-lbl">적용 입찰가(CPC)</div><div class="sim-val o">${(data.cpc || 0).toLocaleString()}원</div></div>
+    <div class="sim-card"><div class="sim-icon">🏆</div><div class="sim-lbl">예상 평균 순위</div><div class="sim-val" style="color:var(--blue); font-size:22px;">${data.estRank || '분석 중'}</div></div>
+    <div class="sim-card"><div class="sim-icon">👆</div><div class="sim-lbl">예상 일 클릭수</div><div class="sim-val b">${(data.estClicks || 0).toLocaleString()}회</div></div>
+    <div class="sim-card"><div class="sim-icon">👁️</div><div class="sim-lbl">예상 노출수</div><div class="sim-val p">${(data.estImpressions || 0).toLocaleString()}</div></div>
+    <div class="sim-card"><div class="sim-icon">📈</div><div class="sim-lbl">월간 예산 추정</div><div class="sim-val" style="color:var(--purple)">${(data.recommendedMonthly || 0).toLocaleString()}원</div></div>
   `;
 
-  // 리스트 결과 업데이트
-  const rows = (data.related || []).map(r => {
-    return `<tr>
+  const rows = (data.related || []).map(r => `
+    <tr>
       <td style="font-weight:500">${r.keyword}</td>
       <td>${(r.totalQcCnt || 0).toLocaleString()}</td>
-      <td style="font-weight:700; color:var(--blue)">${r.estRank || '중상위'}</td>
-      <td style="font-weight:700; color:var(--green)">${(r.cpcAvg || data.cpc).toLocaleString()}원</td>
+      <td style="font-weight:700; color:var(--blue)">${r.estRank || '-'}</td>
+      <td style="font-weight:700; color:var(--green)">${(r.cpcAvg || 0).toLocaleString()}원</td>
       <td><span style="color:#e53e3e; font-weight:700">레드오션</span></td>
-    </tr>`;
-  }).join('');
+    </tr>`).join('');
 
   document.getElementById('simSec').innerHTML = `
-    <div class="sechd"><span class="sect">키워드별 실무 추정 데이터</span><span class="secs">AI 시뮬레이션 결과</span></div>
+    <div class="sechd"><span class="sect">키워드별 실무 추정 데이터</span></div>
     <table><thead><tr><th>키워드</th><th>월 검색량</th><th>예상 순위</th><th>평균 CPC</th><th>경쟁도</th></tr></thead>
     <tbody>${rows}</tbody></table>`;
 
-  sh('sRes');
+  document.getElementById('sRes').style.display = 'block';
 }
 
 document.getElementById('sKw').addEventListener('keydown',e=>{if(e.key==='Enter')startSim();});
