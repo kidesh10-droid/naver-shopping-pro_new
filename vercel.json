@@ -1,10 +1,1 @@
-{
-  "rewrites": [
-    { "source": "/api/search", "destination": "/api/search" },
-    { "source": "/api/keyword", "destination": "/api/keyword" },
-    { "source": "/api/datalab", "destination": "/api/datalab" },
-    { "source": "/api/shopping", "destination": "/api/shopping" },
-    { "source": "/api/simulate", "destination": "/api/simulate" },
-    { "source": "/api/auth", "destination": "/api/auth" }
-  ]
-}
+{}
