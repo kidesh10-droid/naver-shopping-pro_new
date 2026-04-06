@@ -52,42 +52,43 @@ module.exports = async (req, res) => {
     const pcCnt = parseInt(main.monthlyPcQcCnt) || 0;
     const mobCnt = parseInt(main.monthlyMobileQcCnt) || 0;
     const totalCnt = pcCnt + mobCnt;
-    const pcCpc = parseInt(main.avgMonthlyPcClkCost) || 0;
-    const mobCpc = parseInt(main.avgMonthlyMobileClkCost) || 0;
-    const cpc = device === 'mobile' ? mobCpc : pcCpc;
-    const budgetNum = parseInt(budget) || 100000;
-    const estClicks = cpc > 0 ? Math.floor(budgetNum / cpc) : 0;
-    const pcCtr = parseFloat(main.avgMonthlyPcCtr) || 0;
-    const mobCtr = parseFloat(main.avgMonthlyMobileCtr) || 0;
-    const ctr = device === 'mobile' ? mobCtr : pcCtr;
-    const estImpressions = ctr > 0 ? Math.floor(estClicks / (ctr / 100)) : estClicks * 10;
     const compIdx = main.compIdx || 'mid';
 
-    // 연관 키워드 상위 10개 CPC
-    const related = kwList.slice(0, 10).map(k => ({
-      keyword: k.relKeyword,
-      pcQcCnt: parseInt(k.monthlyPcQcCnt) || 0,
-      mobileQcCnt: parseInt(k.monthlyMobileQcCnt) || 0,
-      pcCpc: parseInt(k.avgMonthlyPcClkCost) || 0,
-      mobileCpc: parseInt(k.avgMonthlyMobileClkCost) || 0,
-      compIdx: k.compIdx || 'mid',
-    }));
+    // 경쟁강도 기반 예상 CPC 범위
+    const cpcRange = {
+      high:   { pc: { min: 800,  max: 3000, avg: 1500 }, mobile: { min: 400,  max: 1500, avg: 800  } },
+      mid:    { pc: { min: 300,  max: 800,  avg: 500  }, mobile: { min: 150,  max: 500,  avg: 300  } },
+      low:    { pc: { min: 50,   max: 300,  avg: 150  }, mobile: { min: 30,   max: 150,  avg: 80   } },
+    };
+    const range = cpcRange[compIdx] || cpcRange['mid'];
+    const devRange = device === 'mobile' ? range.mobile : range.pc;
+    const cpc = devRange.avg;
+    const budgetNum = parseInt(budget) || 100000;
+    const estClicks = Math.floor(budgetNum / cpc);
+    const estImpressions = Math.floor(estClicks * (100 / (devRange.avg / 100)));
+
+    // 연관 키워드
+    const related = kwList.slice(0, 10).map(k => {
+      const kComp = k.compIdx || 'mid';
+      const kRange = cpcRange[kComp] || cpcRange['mid'];
+      const kDev = device === 'mobile' ? kRange.mobile : kRange.pc;
+      return {
+        keyword: k.relKeyword,
+        pcQcCnt: parseInt(k.monthlyPcQcCnt) || 0,
+        mobileQcCnt: parseInt(k.monthlyMobileQcCnt) || 0,
+        cpcMin: kDev.min,
+        cpcMax: kDev.max,
+        cpcAvg: kDev.avg,
+        compIdx: kComp,
+        estClicks: Math.floor(budgetNum / kDev.avg),
+      };
+    });
 
     return res.status(200).json({
-      keyword,
-      device: device || 'pc',
-      budget: budgetNum,
-      pcQcCnt: pcCnt,
-      mobileQcCnt: mobCnt,
-      totalQcCnt: totalCnt,
-      pcCpc,
-      mobileCpc: mobCpc,
-      cpc,
-      estClicks,
-      estImpressions,
-      ctr: Math.round(ctr * 100) / 100,
-      compIdx,
-      related,
+      keyword, device: device || 'pc', budget: budgetNum,
+      pcQcCnt: pcCnt, mobileQcCnt: mobCnt, totalQcCnt: totalCnt,
+      cpc, cpcMin: devRange.min, cpcMax: devRange.max,
+      estClicks, estImpressions, compIdx, related,
     });
 
   } catch(e) {
