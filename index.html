@@ -437,7 +437,7 @@ tr.mr td{background:#f0fdf6;}tr:hover td{background:#f9fafb;}tr.mr:hover td{back
 let token = localStorage.getItem('token');
 let userInfo = null;
 let chartInst = null, hChartInst = null;
-let curKw = '', curPeriod = '1year', curUnit = 'month';
+let curKw = '', curPeriod = '1year', curUnit = 'month', curTotal = 0;
 let curCat = '50000000', curCatName = '전체';
 let authMode = 'login';
 let usageCount = 0;
@@ -683,7 +683,7 @@ async function loadChart(period,unit) {
   try {
     const res = await fetch(`/api/datalab?keyword=${enc(curKw)}&timeUnit=${unit}&startDate=${sd}&endDate=${gd(0)}`);
     const data = await res.json();
-    if (data.results) renderChart(curKw,data);
+    if (data.results) renderChart(curKw,data,curTotal);
   } catch(e) { console.error(e); }
 }
 
@@ -692,6 +692,8 @@ function renderKw(kw,kData,dData) {
   const main = list.find(k=>k.relKeyword===kw)||list[0]||{};
   const pc=parseInt(main.monthlyPcQcCnt)||0, mob=parseInt(main.monthlyMobileQcCnt)||0;
   const total=pc+mob, ratio=total>0?Math.round((mob/total)*100):0;
+  curTotalSearch=total; curPcSearch=pc; curMobSearch=mob;
+  curTotal = total;
   const bidData = kData.bid;
   const avgCpc = bidData&&Array.isArray(bidData)&&bidData[0] ? (bidData[0].avgMonthlyPcClkCost||0) : 0;
   const compIdx = main.compIdx||'mid';
@@ -736,13 +738,51 @@ function renderKw(kw,kData,dData) {
 }
 
 function renderChart(kw,dData) {
-  st('cTitle',`"${kw}" 검색 트렌드`);
-  const pts=dData.results[0].data;
+  st('cTitle',`"${kw}" 월별 추정 검색수`);
+  const pts = dData.results[0].data;
+
+  // 가장 최근 트렌드 지수 기준으로 역산
+  const latestRatio = pts[pts.length-1]?.ratio || 100;
+  const baseSearch = curTotalSearch || 1;
+
+  const estSearches = pts.map(p => {
+    if (latestRatio === 0) return 0;
+    return Math.round((p.ratio / latestRatio) * baseSearch);
+  });
+
+  const labels = pts.map(p => p.period.replace(/-/g, '.').slice(0, 7));
+
   if (chartInst) chartInst.destroy();
-  chartInst=new Chart(document.getElementById('tChart').getContext('2d'),{
-    type:'line',
-    data:{labels:pts.map(p=>p.period),datasets:[{label:'트렌드 지수',data:pts.map(p=>p.ratio),borderColor:'#03C75A',backgroundColor:'rgba(3,199,90,0.08)',tension:0.4,fill:true,pointRadius:2,pointHoverRadius:5}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},tooltip:{callbacks:{label:c=>`트렌드 지수: ${c.raw}`}}},scales:{y:{beginAtZero:true,max:100}}}
+  chartInst = new Chart(document.getElementById('tChart').getContext('2d'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: '월간 추정 검색수',
+        data: estSearches,
+        borderColor: '#03C75A',
+        backgroundColor: 'rgba(3,199,90,0.08)',
+        tension: 0.4, fill: true, pointRadius: 3, pointHoverRadius: 6
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top' },
+        tooltip: {
+          callbacks: {
+            label: c => `추정 검색수: ${c.raw.toLocaleString()}건`,
+            afterLabel: () => '※ 현재 검색량 기준 역산 추정값'
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: { callback: v => v >= 10000 ? (v/10000).toFixed(1)+'만' : v.toLocaleString() }
+        }
+      }
+    }
   });
 }
 
