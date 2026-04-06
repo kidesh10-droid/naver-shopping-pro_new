@@ -45,14 +45,14 @@ module.exports = async (req, res) => {
     const kwList = (parsed.keywordList || []).filter(k => k.relKeyword);
     if (kwList.length === 0) return res.status(200).json({ errorMessage: '데이터가 없습니다.' });
 
-    // --- [데이터 추출] ---
+    // --- [1. 데이터 추출 및 안전한 초기화] ---
     const main = kwList.find(k => k.relKeyword === keyword) || kwList[0];
     const pcQcCnt = parseInt(main.monthlyPcQcCnt) || 0;
     const mobileQcCnt = parseInt(main.monthlyMobileQcCnt) || 0;
     const totalQcCnt = pcQcCnt + mobileQcCnt;
     const navCompIdx = main.compIdx || 'mid';
 
-    // --- [진짜 분석 알고리즘 함수] ---
+    // --- [2. 진짜 분석 알고리즘 함수] ---
     const analyzeShoppingMarket = (kw, idx, total, isMobile) => {
       const intensity = Math.pow(Math.log10(total + 10), 2.7);
       const commercePatterns = /기$|용$|세트$|제$|폰$|이어폰$|기기$|장비$|템$/;
@@ -80,30 +80,32 @@ module.exports = async (req, res) => {
     const realStatus = getRealStatus(cpc, totalQcCnt);
     const budgetNum = parseInt(budget) || 100000;
 
-    // --- [진짜 월간 예산 추천: 일 예산 비례] ---
+    // --- [3. 진짜 월간 예산 추천: 일 예산 비례 가변 계산] ---
     const recommendedMonthly = Math.floor(budgetNum * 30.4); 
 
-    // --- [결과 데이터 조립] ---
+    // --- [4. 최종 결과 데이터: 프론트엔드가 요구하는 모든 Key 강제 일치] ---
     return res.status(200).json({
-      keyword,
-      pcQcCnt, 
-      mobileQcCnt, 
-      totalQcCnt,
-      cpc,
+      keyword: keyword,
+      pcQcCnt: pcQcCnt,           // .toLocaleString() 대상
+      mobileQcCnt: mobileQcCnt,   // .toLocaleString() 대상
+      totalQcCnt: totalQcCnt,     // .toLocaleString() 대상
+      cpc: cpc,                   // .toLocaleString() 대상
       cpcMin: Math.floor(cpc * 0.8),
       cpcMax: Math.floor(cpc * 1.3),
       estClicks: Math.floor(budgetNum / cpc),
       estImpressions: Math.floor(totalQcCnt * 0.12),
       compIdx: realStatus.label, 
       compColor: realStatus.color,
-      recommendedMonthly, 
+      recommendedMonthly: recommendedMonthly, // 80만원 넣으면 24,320,000 나옴
       related: kwList.slice(0, 10).map(k => {
         const kt = (parseInt(k.monthlyPcQcCnt) || 0) + (parseInt(k.monthlyMobileQcCnt) || 0);
         const kc = analyzeShoppingMarket(k.relKeyword, k.compIdx, kt, isMobile);
         const ks = getRealStatus(kc, kt);
         return {
           keyword: k.relKeyword,
-          totalQcCnt: kt,
+          totalQcCnt: kt,         // 연관 키워드 에러 방지
+          pcQcCnt: parseInt(k.monthlyPcQcCnt) || 0,
+          mobileQcCnt: parseInt(k.monthlyMobileQcCnt) || 0,
           cpcAvg: kc,
           compIdx: ks.label,
           estClicks: Math.floor(budgetNum / kc)
