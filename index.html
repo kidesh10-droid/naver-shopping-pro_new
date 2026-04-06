@@ -551,6 +551,9 @@ function showAuthErr(msg, success=false) {
 
 // 사용 횟수 체크
 async function checkUsage() {
+  // 베타 테스트 기간 - 전체 무료
+  return true;
+}
   if (!token) {
     // 비회원 - localStorage 체크
     const guestCount = parseInt(localStorage.getItem('guestUsage')||'0');
