@@ -203,6 +203,7 @@ tr.mr td{background:#f0fdf6;}tr:hover td{background:#f9fafb;}tr.mr:hover td{back
 </head>
 <body>
 
+<!-- 메인 화면 -->
 <div id="mainScreen">
 <div class="w">
 
@@ -227,6 +228,7 @@ tr.mr td{background:#f0fdf6;}tr:hover td{background:#f9fafb;}tr.mr:hover td{back
   <button class="tab" onclick="sw('sim')">💰 광고 시뮬레이터</button>
 </div>
 
+<!-- 순위 확인 -->
 <div class="tc on" id="tc-rank">
   <div class="card">
     <div class="row">
@@ -259,6 +261,7 @@ tr.mr td{background:#f0fdf6;}tr:hover td{background:#f9fafb;}tr.mr:hover td{back
   </div>
 </div>
 
+<!-- 키워드 분석 -->
 <div class="tc" id="tc-kw">
   <div class="card">
     <div class="row">
@@ -301,6 +304,7 @@ tr.mr td{background:#f0fdf6;}tr:hover td{background:#f9fafb;}tr.mr:hover td{back
       <table><thead><tr><th>키워드</th><th>월간 PC</th><th>월간 모바일</th><th>합계</th><th>경쟁도</th></tr></thead>
       <tbody id="kwBody"></tbody></table>
     </div>
+    <!-- 쿠팡 배너 -->
     <a class="coupang-banner" id="coupangBanner" href="https://link.coupang.com/a/YOUR_LINK" target="_blank" rel="noopener">
       <div class="cb-left">
         <div class="cb-title">🛍️ 쿠팡에서 관련 상품 최저가 확인</div>
@@ -311,6 +315,7 @@ tr.mr td{background:#f0fdf6;}tr:hover td{background:#f9fafb;}tr.mr:hover td{back
   </div>
 </div>
 
+<!-- 급상승 키워드 -->
 <div class="tc" id="tc-hot">
   <div class="card">
     <div style="margin-bottom:12px;">
@@ -348,11 +353,13 @@ tr.mr td{background:#f0fdf6;}tr:hover td{background:#f9fafb;}tr.mr:hover td{back
   </div>
 </div>
 
+<!-- 광고 시뮬레이터 -->
 <div class="tc" id="tc-sim">
   <div class="card">
     <div class="row">
       <div class="iw"><span class="il">키워드</span><input type="text" id="sKw" placeholder="예: 블루투스 이어폰" /></div>
       <div class="iw"><span class="il">일 예산 (원)</span><input type="number" id="sBudget" placeholder="예: 100000" value="100000" /></div>
+      <div class="iw"><span class="il">키워드 입찰가 (원)</span><input type="number" id="sBid" placeholder="예: 500" /></div>
     </div>
     <div class="opts">
       <div class="ow"><span class="il">디바이스</span>
@@ -360,6 +367,7 @@ tr.mr td{background:#f0fdf6;}tr:hover td{background:#f9fafb;}tr.mr:hover td{back
       </div>
       <button class="btn bp" id="btnS" onclick="startSim()">시뮬레이션</button>
     </div>
+    <p style="font-size:12px;color:var(--t2);margin-top:10px;">💡 입찰가 미입력시 경쟁강도 기반 평균값으로 자동 계산됩니다.</p>
   </div>
   <div class="err" id="sErr"></div>
   <div class="prog" id="sProg">
@@ -367,6 +375,10 @@ tr.mr td{background:#f0fdf6;}tr:hover td{background:#f9fafb;}tr.mr:hover td{back
   </div>
   <div class="sr" id="sRes">
     <div class="sim-grid" id="simGrid"></div>
+    <div class="sec" id="aiSec" style="margin-bottom:16px;display:none;">
+      <div class="sechd"><span class="sect">🤖 AI 광고 전략 분석</span><span class="secs">Gemini AI 분석</span></div>
+      <div id="aiAnalysisText" style="padding:18px;font-size:14px;line-height:1.8;color:var(--t);white-space:pre-wrap;"></div>
+    </div>
     <div class="sec" id="simSec"></div>
   </div>
 </div>
@@ -374,6 +386,7 @@ tr.mr td{background:#f0fdf6;}tr:hover td{background:#f9fafb;}tr.mr:hover td{back
 </div>
 </div>
 
+<!-- 로그인 팝업 -->
 <div class="overlay" id="loginPopup">
   <div class="popup">
     <div class="popup-icon">👋</div>
@@ -400,6 +413,7 @@ tr.mr td{background:#f0fdf6;}tr:hover td{background:#f9fafb;}tr.mr:hover td{back
   </div>
 </div>
 
+<!-- 횟수 초과 팝업 -->
 <div class="overlay" id="payPopup">
   <div class="popup">
     <div class="popup-icon">🎁</div>
@@ -780,13 +794,14 @@ function renderHot(data) {
 
 // ===== 광고 시뮬레이터 =====
 async function startSim() {
-  const kw=v('sKw'), budget=parseInt(v('sBudget')), dev=v('sDev');
+  const kw=v('sKw'), budget=parseInt(v('sBudget')), dev=v('sDev'), bid=v('sBid');
   if (!kw) { se('sErr','키워드를 입력해주세요.'); return; }
   if (!budget||budget<=0) { se('sErr','예산을 입력해주세요.'); return; }
   if (!await checkUsage()) return;
   he('sErr'); sh('sProg'); hi('sRes'); dis('btnS');
   try {
-    const res=await fetch(`/api/simulate?keyword=${enc(kw)}&budget=${budget}&device=${dev}`);
+    const bidParam = bid ? `&bidPrice=${bid}` : '';
+    const res=await fetch(`/api/simulate?keyword=${enc(kw)}&budget=${budget}&device=${dev}${bidParam}`);
     const text=await res.text();
     hi('sProg');
     if(!text||text.trim()===''){throw new Error('응답이 비어있습니다. 광고 API 키를 확인해주세요.');}
@@ -801,50 +816,47 @@ async function startSim() {
 function renderSim(kw,budget,dev,data) {
   if (data.errorMessage) { se('sErr', data.errorMessage); return; }
 
-  // [수정] 서버에서 보낸 색상/텍스트를 우선적으로 사용 (한글 경쟁강도 대응)
-  const compColor = data.compColor || (data.compIdx === '레드오션(극심)' ? '#e53e3e' : '#F59E0B');
-  const compText = data.compIdx || '보통';
+  const compColor = data.compColor || (data.compIdx==='높음'?'#D84315':data.compIdx==='중간'?'#F59E0B':'#03C75A');
+  const compText = data.compIdx || '중간';
+
+  // 노출순위 카드
+  const rankCard = data.estRank && data.estRank !== '-' ? `
+    <div class="sim-card"><div class="sim-icon">🎯</div><div class="sim-lbl">예상 노출 순위</div><div class="sim-val" style="font-size:20px;color:var(--blue)">${data.estRank}</div><div class="sim-sub">${data.rankComment}</div></div>` : '';
 
   document.getElementById('simGrid').innerHTML = `
-    <div class="sim-card"><div class="sim-icon">🔍</div><div class="sim-lbl">월간 총 검색량</div><div class="sim-val g">${(data.totalQcCnt || 0).toLocaleString()}</div><div class="sim-sub">PC ${(data.pcQcCnt || 0).toLocaleString()} + 모바일 ${(data.mobileQcCnt || 0).toLocaleString()}</div></div>
-    <div class="sim-card"><div class="sim-icon">💰</div><div class="sim-lbl">예상 평균 CPC</div><div class="sim-val o">${(data.cpc || 0).toLocaleString()}원</div><div class="sim-sub">${(data.cpcMin || 0).toLocaleString()}~${(data.cpcMax || 0).toLocaleString()}원 범위</div></div>
-    <div class="sim-card"><div class="sim-icon">👆</div><div class="sim-lbl">예상 일 클릭수</div><div class="sim-val b">${(data.estClicks || 0).toLocaleString()}</div><div class="sim-sub">일 예산 ${budget.toLocaleString()}원 기준</div></div>
+    <div class="sim-card"><div class="sim-icon">🔍</div><div class="sim-lbl">월간 총 검색량</div><div class="sim-val g">${(data.totalQcCnt||0).toLocaleString()}</div><div class="sim-sub">PC ${(data.pcQcCnt||0).toLocaleString()} + 모바일 ${(data.mobileQcCnt||0).toLocaleString()}</div></div>
+    <div class="sim-card"><div class="sim-icon">💰</div><div class="sim-lbl">예상 평균 CPC</div><div class="sim-val o">${(data.cpc||0).toLocaleString()}원</div><div class="sim-sub">${(data.cpcMin||0).toLocaleString()}~${(data.cpcMax||0).toLocaleString()}원 범위</div></div>
+    <div class="sim-card"><div class="sim-icon">👆</div><div class="sim-lbl">예상 일 클릭수</div><div class="sim-val b">${(data.estClicks||0).toLocaleString()}</div><div class="sim-sub">일 예산 ${budget.toLocaleString()}원 기준</div></div>
     <div class="sim-card"><div class="sim-icon">📊</div><div class="sim-lbl">광고 경쟁강도</div><div class="sim-val" style="color:${compColor}">${compText}</div><div class="sim-sub">${kw} 기준</div></div>
-    <div class="sim-card"><div class="sim-icon">👁️</div><div class="sim-lbl">예상 노출수</div><div class="sim-val p">${(data.estImpressions || 0).toLocaleString()}</div><div class="sim-sub">${dev === 'mobile' ? '모바일' : 'PC'} 기준</div></div>
-    <div class="sim-card">
-        <div class="sim-icon">📈</div>
-        <div class="sim-lbl">월간 예산 추천</div>
-        <div class="sim-val" style="color:var(--purple)">${(data.recommendedMonthly || 0).toLocaleString()}원~</div>
-        <div class="sim-sub">현재 일 예산(${budget.toLocaleString()}원) 한 달 기준</div>
-    </div>`;
+    <div class="sim-card"><div class="sim-icon">👁️</div><div class="sim-lbl">예상 노출수</div><div class="sim-val p">${(data.estImpressions||0).toLocaleString()}</div><div class="sim-sub">${dev==='mobile'?'모바일':'PC'} 기준</div></div>
+    ${rankCard}`;
 
-  const maxCpc = Math.max(...(data.related || []).map(r => r.cpcAvg || 0));
-  const rows = (data.related || []).map(r => {
-    const total = (r.pcQcCnt || 0) + (r.mobileQcCnt || 0);
-    const pct = maxCpc > 0 ? Math.round((r.cpcAvg / maxCpc) * 100) : 0;
-    
-    // 연관 키워드 경쟁강도 색상 처리 (서버 한글 데이터 기반)
-    let cl = '#38a169'; 
-    if(r.compIdx === '레드오션(극심)') cl = '#e53e3e';
-    else if(r.compIdx === '매우 높음') cl = '#dd6b20';
-    else if(r.compIdx === '치열함') cl = '#3182ce';
+  // AI 분석 코멘트
+  if (data.aiComment) {
+    document.getElementById('aiComment').textContent = data.aiComment;
+    document.getElementById('aiAnalysis').style.display = 'block';
+  }
 
+  const maxCpc = Math.max(...(data.related||[]).map(r=>r.cpcAvg||0));
+  const rows = (data.related||[]).map(r => {
+    const pct = maxCpc>0 ? Math.round((r.cpcAvg/maxCpc)*100) : 0;
+    const cl = r.compIdx==='높음'?'#D84315':r.compIdx==='중간'?'#F59E0B':'#03C75A';
     return `<tr>
       <td style="font-weight:500">${r.keyword}</td>
-      <td>${(r.totalQcCnt || total || 0).toLocaleString()}</td>
-      <td><div class="bid-bar"><div class="bid-bar-in" style="width:${pct}%;max-width:80px;background:var(--blue)"></div><span style="font-size:12px;margin-left:4px">${(r.cpcAvg || 0).toLocaleString()}원</span></div></td>
-      <td style="font-weight:700;color:var(--green)">${(r.estClicks || 0).toLocaleString()}회</td>
-      <td><span style="color:${cl};font-weight:700">${r.compIdx}</span></td>
+      <td>${(r.totalQcCnt||0).toLocaleString()}</td>
+      <td><div class="bid-bar"><div class="bid-bar-in" style="width:${pct}%;max-width:80px"></div><span style="font-size:12px;margin-left:4px">${(r.cpcMin||0).toLocaleString()}~${(r.cpcMax||0).toLocaleString()}원</span></div></td>
+      <td style="font-weight:700;color:var(--green)">${(r.estClicks||0).toLocaleString()}회</td>
+      <td><span style="color:${cl};font-weight:500">${r.compIdx}</span></td>
     </tr>`;
   }).join('');
 
   document.getElementById('simSec').innerHTML = `
     <div class="sechd">
       <span class="sect">연관 키워드 입찰가 분석</span>
-      <span class="secs">일 예산 ${budget.toLocaleString()}원 기준 · 실무 쇼핑 데이터 기반</span>
+      <span class="secs">일 예산 ${budget.toLocaleString()}원 기준 · 경쟁강도 기반 예상값</span>
     </div>
-    <div style="padding:10px 18px;font-size:12px;color:var(--t3);border-bottom:1px solid var(--bd);">⚠️ 본 수치는 검색량과 카테고리 성격을 분석한 추정치로 실무 가이드용입니다.</div>
-    <table><thead><tr><th>키워드</th><th>월간 검색량</th><th>예상 CPC</th><th>예상 일 클릭</th><th>경쟁도</th></tr></thead>
+    <div style="padding:10px 18px;font-size:12px;color:var(--t3);border-bottom:1px solid var(--bd);">⚠️ CPC는 경쟁강도 기반 예상값입니다. 실제 입찰가와 다를 수 있어요.</div>
+    <table><thead><tr><th>키워드</th><th>월간 검색량</th><th>예상 CPC 범위</th><th>예상 일 클릭</th><th>경쟁도</th></tr></thead>
     <tbody>${rows}</tbody></table>`;
 
   sh('sRes');
