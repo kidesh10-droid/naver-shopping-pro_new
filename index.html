@@ -701,11 +701,11 @@ function renderKw(kw,kData,dData) {
   // 모바일 비율 기반 쇼핑 전환율 동적 계산
   const mobRatio2 = total > 0 ? mob / total : 0.7;
   let shopRate2;
-  if (mobRatio2 >= 0.75) shopRate2 = 0.90;
-  else if (mobRatio2 >= 0.65) shopRate2 = 0.75;
-  else if (mobRatio2 >= 0.55) shopRate2 = 0.60;
-  else if (mobRatio2 >= 0.45) shopRate2 = 0.45;
-  else shopRate2 = 0.30;
+  if (mobRatio2 >= 0.75) shopRate2 = 1.80;
+  else if (mobRatio2 >= 0.65) shopRate2 = 1.50;
+  else if (mobRatio2 >= 0.55) shopRate2 = 1.20;
+  else if (mobRatio2 >= 0.45) shopRate2 = 0.90;
+  else shopRate2 = 0.60;
   const shopEst = Math.round(total * shopRate2);
   const shopRatePct = Math.round(shopRate2 * 100);
 
@@ -765,11 +765,11 @@ function renderChart(kw,dData) {
   // 모바일 비율이 높을수록 쇼핑 목적 검색 가능성 높음
   // 모바일 70% 이상 = 쇼핑성 키워드로 판단 → 전환율 높음
   let shopRate;
-  if (mobRatio >= 0.75) shopRate = 0.90;      // 매우 높은 쇼핑성
-  else if (mobRatio >= 0.65) shopRate = 0.75; // 높은 쇼핑성
-  else if (mobRatio >= 0.55) shopRate = 0.60; // 보통
-  else if (mobRatio >= 0.45) shopRate = 0.45; // 낮음
-  else shopRate = 0.30;                        // 정보성
+  if (mobRatio >= 0.75) shopRate = 1.80;      // 매우 높은 쇼핑성
+  else if (mobRatio >= 0.65) shopRate = 1.50; // 높은 쇼핑성
+  else if (mobRatio >= 0.55) shopRate = 1.20; // 보통
+  else if (mobRatio >= 0.45) shopRate = 0.90; // 낮음
+  else shopRate = 0.60;                        // 정보성
 
   const baseSearch = Math.round(total * shopRate);
 
@@ -898,13 +898,14 @@ function renderSim(kw,budget,dev,data) {
 
   document.getElementById('simGrid').innerHTML = `
     <div class="sim-card"><div class="sim-icon">🔍</div><div class="sim-lbl">월간 총 검색량</div><div class="sim-val g">${(data.totalQcCnt||0).toLocaleString()}</div><div class="sim-sub">PC ${(data.pcQcCnt||0).toLocaleString()} + 모바일 ${(data.mobileQcCnt||0).toLocaleString()}</div></div>
-    <div class="sim-card"><div class="sim-icon">🛒</div><div class="sim-lbl">네이버 쇼핑 상품수</div><div class="sim-val b">${(data.productCount||0).toLocaleString()}</div><div class="sim-sub">검색 결과 기준</div></div>
-    <div class="sim-card"><div class="sim-icon">📊</div><div class="sim-lbl">경쟁강도</div><div class="sim-val" style="font-size:16px;color:${compColor}">${compLevel}</div><div class="sim-sub">검색량 / 상품수 분석</div></div>
-    <div class="sim-card"><div class="sim-icon">💰</div><div class="sim-lbl">상위 평균 판매가</div><div class="sim-val o">${data.avgPrice>0?(data.avgPrice).toLocaleString()+'원':'데이터없음'}</div><div class="sim-sub">상위 20개 기준</div></div>
-    <div class="sim-card"><div class="sim-icon">⭐</div><div class="sim-lbl">평균 리뷰수</div><div class="sim-val p">${(data.avgReview||0).toLocaleString()}</div><div class="sim-sub">상위 20개 기준</div></div>
-    <div class="sim-card"><div class="sim-icon">💸</div><div class="sim-lbl">시장 평균 CPC</div><div class="sim-val" style="color:var(--purple)">${(data.marketAvgCpc||0).toLocaleString()}원</div><div class="sim-sub">${dev==='mobile'?'모바일':'PC'} 기준</div></div>
-    <div class="sim-card"><div class="sim-icon">👆</div><div class="sim-lbl">예상 일 클릭수</div><div class="sim-val" style="color:var(--blue)">${(data.estClicks||0).toLocaleString()}</div><div class="sim-sub">일 예산 ${budget.toLocaleString()}원 기준</div></div>
-    <div class="sim-card"><div class="sim-icon">📅</div><div class="sim-lbl">월 예산 추정</div><div class="sim-val" style="color:var(--orange)">${(data.recommendedMonthly||0).toLocaleString()}원</div><div class="sim-sub">일 예산 × 30일</div></div>
+    <div class="sim-card"><div class="sim-icon">🛒</div><div class="sim-lbl">쇼핑 상품수</div><div class="sim-val b">${(data.productCount||0).toLocaleString()}</div><div class="sim-sub">네이버 쇼핑 기준</div></div>
+    <div class="sim-card"><div class="sim-icon">📊</div><div class="sim-lbl">경쟁강도</div><div class="sim-val" style="font-size:15px;color:${compColor}">${compLevel}</div><div class="sim-sub">검색량 ÷ 상품수</div></div>
+    <div class="sim-card"><div class="sim-icon">⭐</div><div class="sim-lbl">평균 리뷰수</div><div class="sim-val o">${(data.avgReview||0).toLocaleString()}</div><div class="sim-sub">상위 100개 기준</div></div>
+    <div class="sim-card"><div class="sim-icon">🏆</div><div class="sim-lbl">최고 리뷰수</div><div class="sim-val" style="color:var(--gold)">${(data.maxReview||0).toLocaleString()}</div><div class="sim-sub">1위 상품 기준</div></div>
+    <div class="sim-card"><div class="sim-icon">📭</div><div class="sim-lbl">리뷰 0개 비율</div><div class="sim-val" style="color:${(data.zeroReviewRate||0)>50?'#03C75A':'#D84315'}">${data.zeroReviewRate||0}%</div><div class="sim-sub">${(data.zeroReviewRate||0)>50?'진입 유리 👍':'진입 어려움 ⚠️'}</div></div>
+    <div class="sim-card"><div class="sim-icon">💰</div><div class="sim-lbl">평균 판매가</div><div class="sim-val" style="color:var(--red)">${(data.avgPrice||0).toLocaleString()}원</div><div class="sim-sub">최저 ${(data.minPrice||0).toLocaleString()}원</div></div>
+    <div class="sim-card"><div class="sim-icon">💸</div><div class="sim-lbl">시장 평균 CPC</div><div class="sim-val" style="color:var(--orange)">${(data.marketAvgCpc||0).toLocaleString()}원</div><div class="sim-sub">${dev==='mobile'?'모바일':'PC'} 기준</div></div>
+    <div class="sim-card"><div class="sim-icon">👆</div><div class="sim-lbl">예상 일 클릭수</div><div class="sim-val p">${(data.estClicks||0).toLocaleString()}</div><div class="sim-sub">일 예산 ${budget.toLocaleString()}원</div></div>
     ${rankCard}`;
 
   if (data.aiComment) {
@@ -920,10 +921,10 @@ function renderSim(kw,budget,dev,data) {
       <td style="font-weight:500">${r.keyword}</td>
       <td>${(r.totalQcCnt||0).toLocaleString()}</td>
       <td>${(r.productCount||0).toLocaleString()}</td>
-      <td>${r.avgPrice>0?r.avgPrice.toLocaleString()+'원':'-'}</td>
-      <td>${(r.avgReview||0).toLocaleString()}</td>
-      <td>${(r.cpcAvg||0).toLocaleString()}원</td>
       <td><span style="color:${cl};font-weight:600;font-size:12px">${r.compLevel||'-'}</span></td>
+      <td style="font-weight:700">${(r.avgReview||0).toLocaleString()}</td>
+      <td>${(r.avgPrice||0).toLocaleString()}원</td>
+      <td>${(r.cpcAvg||0).toLocaleString()}원</td>
       <td style="font-weight:700;color:var(--green)">${(r.estClicks||0).toLocaleString()}회</td>
     </tr>`;
   }).join('');
@@ -931,13 +932,10 @@ function renderSim(kw,budget,dev,data) {
   document.getElementById('simSec').innerHTML = `
     <div class="sechd">
       <span class="sect">연관 키워드 분석</span>
-      <span class="secs">검색량 / 상품수 / 가격 / 리뷰 종합</span>
+      <span class="secs">검색량 · 상품수 · 리뷰 · 가격 종합</span>
     </div>
-    <div style="padding:10px 18px;font-size:12px;color:var(--t3);border-bottom:1px solid var(--bd);">
-      💡 평균 판매가·리뷰수는 네이버 쇼핑 상위 20개 상품 기준이에요.
-    </div>
-    <table style="font-size:12px;"><thead><tr>
-      <th>키워드</th><th>검색량</th><th>상품수</th><th>평균가</th><th>평균리뷰</th><th>평균CPC</th><th>경쟁강도</th><th>예상클릭</th>
+    <table><thead><tr>
+      <th>키워드</th><th>검색량</th><th>상품수</th><th>경쟁강도</th><th>평균리뷰</th><th>평균가격</th><th>평균CPC</th><th>예상클릭</th>
     </tr></thead>
     <tbody>${rows}</tbody></table>`;
 
