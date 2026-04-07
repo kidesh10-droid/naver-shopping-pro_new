@@ -65,7 +65,7 @@ module.exports = async (req, res) => {
     const rawData = await new Promise((resolve, reject) => {
       const r = https.request({
         hostname: 'generativelanguage.googleapis.com',
-        path: `/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+        path: `/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`,
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
