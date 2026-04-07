@@ -2,12 +2,12 @@ const https = require('https');
 const crypto = require('crypto');
 const CUSTOMER_ID = '2905718';
 
-// 네이버 쇼핑 상품수 조회
-async function getProductCount(keyword) {
+// 네이버 쇼핑 상품수 + 리뷰 데이터 조회
+async function getShoppingData(keyword) {
   return new Promise((resolve) => {
     https.get({
       hostname: 'openapi.naver.com',
-      path: `/v1/search/shop.json?query=${encodeURIComponent(keyword)}&display=1`,
+      path: `/v1/search/shop.json?query=${encodeURIComponent(keyword)}&display=100&sort=sim`,
       headers: {
         'X-Naver-Client-Id': process.env.NAVER_CLIENT_ID,
         'X-Naver-Client-Secret': process.env.NAVER_CLIENT_SECRET,
@@ -15,14 +15,32 @@ async function getProductCount(keyword) {
     }, (r) => {
       let b = ''; r.on('data', c => b += c);
       r.on('end', () => {
-        try { resolve(JSON.parse(b).total || 0); }
-        catch(e) { resolve(0); }
+        try {
+          const d = JSON.parse(b);
+          const items = d.items || [];
+          const total = d.total || 0;
+
+          // 리뷰 데이터 분석
+          const reviews = items.map(i => parseInt(i.reviewCount) || 0);
+          const reviewSum = reviews.reduce((a, b) => a + b, 0);
+          const avgReview = reviews.length > 0 ? Math.round(reviewSum / reviews.length) : 0;
+          const maxReview = reviews.length > 0 ? Math.max(...reviews) : 0;
+          const zeroReviewCount = reviews.filter(r => r === 0).length;
+          const zeroReviewRate = reviews.length > 0 ? Math.round((zeroReviewCount / reviews.length) * 100) : 0;
+
+          // 가격 데이터
+          const prices = items.map(i => parseInt(i.lprice) || 0).filter(p => p > 0);
+          const avgPrice = prices.length > 0 ? Math.round(prices.reduce((a,b) => a+b, 0) / prices.length) : 0;
+          const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
+
+          resolve({ total, avgReview, maxReview, zeroReviewRate, avgPrice, minPrice, items: items.slice(0, 5) });
+        } catch(e) { resolve({ total: 0, avgReview: 0, maxReview: 0, zeroReviewRate: 0, avgPrice: 0, minPrice: 0, items: [] }); }
       });
-    }).on('error', () => resolve(0));
+    }).on('error', () => resolve({ total: 0, avgReview: 0, maxReview: 0, zeroReviewRate: 0, avgPrice: 0, minPrice: 0, items: [] }));
   });
 }
 
-// 경쟁강도 계산 (검색량 / 상품수)
+// 경쟁강도 계산
 function calcCompetition(searchCnt, productCnt) {
   if (productCnt === 0) return { level: '데이터없음', color: '#9ca3af', score: 0 };
   const ratio = searchCnt / productCnt;
@@ -33,25 +51,18 @@ function calcCompetition(searchCnt, productCnt) {
   return { level: '레드오션 🔴', color: '#D84315', score: ratio };
 }
 
-// 검색량 + 상품수 기반 CPC 추정 (모든 키워드 공통 공식)
+// CPC 추정
 function estimateCpc(totalSearch, productCount, device) {
   if (totalSearch === 0) return 100;
-
-  // 경쟁밀도 = 상품수 / 검색량 (높을수록 경쟁 심함 → CPC 높음)
   const density = productCount > 0 ? productCount / totalSearch : 10;
-
-  // 기본 CPC = 경쟁밀도 × 검색량 로그 × 디바이스 보정
   const logSearch = Math.log10(totalSearch + 1);
   const deviceMult = device === 'mobile' ? 0.85 : 1.0;
   let cpc = density * logSearch * 180 * deviceMult;
-
-  // 상한/하한 설정
   cpc = Math.max(70, Math.min(cpc, 8000));
-
-  return Math.round(cpc / 10) * 10; // 10원 단위 반올림
+  return Math.round(cpc / 10) * 10;
 }
 
-// 예상 노출 순위 (입찰가 / 평균CPC 비율 기반)
+// 예상 노출 순위
 function inferRank(userBid, avgCpc, totalSearch) {
   if (!userBid || userBid === 0) return '입찰가 입력 시 확인 가능';
   const ratio = userBid / avgCpc;
@@ -93,8 +104,8 @@ module.exports = async (req, res) => {
     const signature = crypto.createHmac('sha256', Buffer.from(process.env.NAVER_AD_SECRET_KEY, 'utf-8'))
       .update(Buffer.from(msg, 'utf-8')).digest('base64');
 
-    // 검색량 + 메인 키워드 상품수 병렬 호출
-    const [kwData, productCount] = await Promise.all([
+    // 검색량 + 쇼핑 데이터 병렬 호출
+    const [kwData, shopData] = await Promise.all([
       new Promise((resolve, reject) => {
         function doReq(opts) {
           https.request(opts, (r) => {
@@ -120,7 +131,7 @@ module.exports = async (req, res) => {
           }
         });
       }),
-      getProductCount(keyword)
+      getShoppingData(keyword)
     ]);
 
     if (!kwData.body || kwData.body.trim() === '') {
@@ -138,38 +149,34 @@ module.exports = async (req, res) => {
     const budgetNum = parseInt(budget);
     const userBid = parseInt(bid);
 
-    // 공통 공식으로 CPC 계산
-    const marketAvgCpc = estimateCpc(totalQc, productCount, device);
+    const marketAvgCpc = estimateCpc(totalQc, shopData.total, device);
     const finalCpc = userBid > 0 ? userBid : marketAvgCpc;
-
-    // 경쟁강도 계산
-    const comp = calcCompetition(totalQc, productCount);
-
-    // 예상 순위 / 클릭 / 노출
+    const comp = calcCompetition(totalQc, shopData.total);
     const estRank = inferRank(userBid, marketAvgCpc, totalQc);
     const estClicks = finalCpc > 0 ? Math.floor(budgetNum / finalCpc) : 0;
     const estImpressions = Math.floor(estClicks * 12);
     const recommendedMonthly = budgetNum * 30;
 
-    // 연관 키워드 병렬로 상품수 조회
+    // 연관 키워드 병렬 조회
     const relatedRaw = kwList.slice(0, 10);
-    const relatedProducts = await Promise.all(
-      relatedRaw.map(k => getProductCount(k.relKeyword))
+    const relatedShopData = await Promise.all(
+      relatedRaw.map(k => getShoppingData(k.relKeyword))
     );
 
     const related = relatedRaw.map((k, i) => {
       const kt = (parseInt(k.monthlyPcQcCnt) || 0) + (parseInt(k.monthlyMobileQcCnt) || 0);
-      const kProd = relatedProducts[i];
-      const kComp = calcCompetition(kt, kProd);
-      const kCpc = estimateCpc(kt, kProd, device);
+      const kShop = relatedShopData[i];
+      const kComp = calcCompetition(kt, kShop.total);
+      const kCpc = estimateCpc(kt, kShop.total, device);
       return {
         keyword: k.relKeyword,
         totalQcCnt: kt,
-        productCount: kProd,
+        productCount: kShop.total,
+        avgReview: kShop.avgReview,
+        avgPrice: kShop.avgPrice,
         cpcAvg: kCpc,
         compLevel: kComp.level,
         compColor: kComp.color,
-        compScore: Math.round(kComp.score * 1000) / 1000,
         estClicks: kCpc > 0 ? Math.floor(budgetNum / kCpc) : 0,
         estRank: inferRank(userBid || kCpc, kCpc, kt),
       };
@@ -180,7 +187,12 @@ module.exports = async (req, res) => {
       pcQcCnt: pcQc,
       mobileQcCnt: mobQc,
       totalQcCnt: totalQc,
-      productCount,
+      productCount: shopData.total,
+      avgReview: shopData.avgReview,
+      maxReview: shopData.maxReview,
+      zeroReviewRate: shopData.zeroReviewRate,
+      avgPrice: shopData.avgPrice,
+      minPrice: shopData.minPrice,
       cpc: finalCpc,
       marketAvgCpc,
       estRank,
