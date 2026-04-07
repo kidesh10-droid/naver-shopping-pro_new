@@ -65,7 +65,7 @@ module.exports = async (req, res) => {
     const rawData = await new Promise((resolve, reject) => {
       const r = https.request({
         hostname: 'generativelanguage.googleapis.com',
-        path: `/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`,
+        path: `/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -83,7 +83,9 @@ module.exports = async (req, res) => {
 
     // 상태코드 확인
     if (rawData.status !== 200) {
-      return res.status(200).json({ error: `Gemini API 오류 (${rawData.status})`, raw: rawData.body.slice(0, 200) });
+      let errMsg = '';
+      try { const eb = JSON.parse(rawData.body); errMsg = eb.error?.message || rawData.body.slice(0,200); } catch(e) { errMsg = rawData.body.slice(0,200); }
+      return res.status(200).json({ error: `Gemini API 오류 (${rawData.status}): ${errMsg}` });
     }
 
     if (!rawData.body || rawData.body.trim() === '') {
