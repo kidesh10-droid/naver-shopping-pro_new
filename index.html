@@ -395,27 +395,12 @@ tr.mr td{background:#f0fdf6;}tr:hover td{background:#f9fafb;}tr.mr:hover td{back
       <div class="iw"><span class="il">메인 키워드</span><input type="text" id="seoKw" placeholder="예: 블루투스 이어폰" /></div>
       <div class="iw"><span class="il">브랜드명 (선택)</span><input type="text" id="seoBrand" placeholder="예: SoundPEATS" /></div>
     </div>
-    <div class="row">
-      <div class="iw"><span class="il">주요 특징 (선택, 쉼표로 구분)</span><input type="text" id="seoFeature" placeholder="예: 노이즈캔슬링, 방수, 30시간 배터리" /></div>
-    </div>
     <div class="opts">
-      <div class="ow"><span class="il">카테고리</span>
-        <select id="seoCat">
-          <option value="이어폰">이어폰/헤드폰</option>
-          <option value="마이크">마이크</option>
-          <option value="가습기">가습기</option>
-          <option value="진공포장기">진공포장기</option>
-          <option value="헤어드라이어">헤어드라이어</option>
-          <option value="전기포트">전기포트</option>
-          <option value="냉장고">냉장고</option>
-          <option value="기타">기타</option>
-        </select>
-      </div>
       <button class="btn" style="background:#7B1FA2;color:#fff" id="btnSeo" onclick="startSeo()">✍️ 상품명 생성</button>
     </div>
   </div>
   <div class="err" id="seoErr"></div>
-  <div class="prog" id="seoProg">
+  <div class="prog" id="seoProg" style="display:none;">
     <div class="ph"><div class="spin"></div><div><div class="pt">SEO 상품명 생성 중...</div><div class="ps">키워드 분석 + AI 최적화 중</div></div></div>
   </div>
   <div style="display:none" id="seoRes">
@@ -1006,71 +991,55 @@ function renderSim(kw,budget,dev,data) {
 
 // ===== SEO 상품명 생성 =====
 async function startSeo() {
-  const kw = v('seoKw');
-  const brand = v('seoBrand');
-  const feature = v('seoFeature');
-  const cat = v('seoCat');
+  const kw = document.getElementById('seoKw').value.trim();
+  const brand = document.getElementById('seoBrand').value.trim();
   if (!kw) { se('seoErr','메인 키워드를 입력해주세요.'); return; }
   he('seoErr');
-  sh('seoProg');
+  document.getElementById('seoProg').style.display = 'block';
   document.getElementById('seoRes').style.display = 'none';
-  dis('btnSeo');
+  document.getElementById('btnSeo').disabled = true;
 
   try {
     // 1. 연관 키워드 검색량 조회
-    const kwRes = await fetch(`/api/keyword?keyword=${enc(kw)}`);
+    const kwRes = await fetch('/api/keyword?keyword=' + encodeURIComponent(kw));
     const kwData = await kwRes.json();
-    const kwList = (kwData.keyword?.keywordList||[])
-      .filter(k => k.monthlyPcQcCnt !== undefined)
-      .sort((a,b) => (parseInt(b.monthlyMobileQcCnt)||0)+(parseInt(b.monthlyPcQcCnt)||0) - ((parseInt(a.monthlyMobileQcCnt)||0)+(parseInt(a.monthlyPcQcCnt)||0)))
+
+    const kwList = ((kwData.keyword && kwData.keyword.keywordList) || [])
+      .filter(function(k) { return k.monthlyPcQcCnt !== undefined; })
+      .sort(function(a,b) {
+        return ((parseInt(b.monthlyMobileQcCnt)||0)+(parseInt(b.monthlyPcQcCnt)||0)) -
+               ((parseInt(a.monthlyMobileQcCnt)||0)+(parseInt(a.monthlyPcQcCnt)||0));
+      })
       .slice(0, 15);
 
-    // 2. Gemini로 SEO 상품명 생성
-    const kwListText = kwList.map(k => {
+    // 연관 키워드 텍스트 생성
+    const kwListText = kwList.map(function(k) {
       const total = (parseInt(k.monthlyPcQcCnt)||0) + (parseInt(k.monthlyMobileQcCnt)||0);
-      return `${k.relKeyword}(${total.toLocaleString()}회)`;
+      return k.relKeyword + '(' + total.toLocaleString() + '회)';
     }).join(', ');
 
-    const prompt = `당신은 네이버 쇼핑 SEO 전문가입니다. 아래 정보를 바탕으로 네이버 쇼핑 SEO에 최적화된 상품명을 JSON으로만 출력하세요.
+    // 2. SEO API 호출 (POST 방식으로 변경)
+    const seoRes = await fetch('/api/seo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        keyword: kw,
+        brand: brand,
+        kwListText: kwListText
+      })
+    });
+    const seoData = await seoRes.json();
 
-[입력 정보]
-- 메인 키워드: ${kw}
-- 카테고리: ${cat}
-${brand ? `- 브랜드: ${brand}` : ''}
-${feature ? `- 주요 특징: ${feature}` : ''}
-- 연관 키워드 (검색량 순): ${kwListText}
+    if (seoData.error) throw new Error(seoData.error);
 
-[규칙 - 반드시 준수]
-1. 상품명은 60자 이내 (필수)
-2. 검색량 높은 연관 키워드를 자연스럽게 포함
-3. 브랜드명이 있으면 앞에 배치
-4. 특징/혜택을 구체적으로 표현
-5. 동일한 단어 절대 중복 사용 금지 (예: "블루투스 블루투스" 불가)
-6. 유사 의미 단어도 중복 금지 (예: "이어폰 이어버드" 같이 쓰지 말것)
-7. 한국어로 작성
-8. 각 상품명은 서로 다른 키워드 조합으로 다양하게 작성
+    document.getElementById('seoProg').style.display = 'none';
+    renderSeo(kw, kwList, seoData);
 
-[출력 형식 - JSON만]
-{
-  "names": [
-    {"name": "상품명1", "length": 글자수, "keywords": ["포함된키워드1", "포함된키워드2"]},
-    {"name": "상품명2", "length": 글자수, "keywords": ["포함된키워드1", "포함된키워드2"]},
-    {"name": "상품명3", "length": 글자수, "keywords": ["포함된키워드1", "포함된키워드2"]}
-  ],
-  "recommendTags": ["추천태그1", "추천태그2", "추천태그3", "추천태그4", "추천태그5"],
-  "tip": "상품명 작성 팁 한줄"
-}`;
-
-    const geminiRes = await fetch(`/api/seo?prompt=${enc(prompt)}`);
-    const geminiData = await geminiRes.json();
-
-    hi('seoProg');
-    renderSeo(kw, kwList, geminiData);
   } catch(e) {
-    hi('seoProg');
+    document.getElementById('seoProg').style.display = 'none';
     se('seoErr', '오류: ' + e.message);
   } finally {
-    en('btnSeo');
+    document.getElementById('btnSeo').disabled = false;
   }
 }
 
