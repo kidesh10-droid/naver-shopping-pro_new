@@ -902,16 +902,27 @@ function renderSim(kw,budget,dev,data) {
     <div class="sim-card"><div class="sim-icon">🔍</div><div class="sim-lbl">월간 총 검색량</div><div class="sim-val g">${(data.totalQcCnt||0).toLocaleString()}</div><div class="sim-sub">PC ${(data.pcQcCnt||0).toLocaleString()} + 모바일 ${(data.mobileQcCnt||0).toLocaleString()}</div></div>
     <div class="sim-card"><div class="sim-icon">🛒</div><div class="sim-lbl">쇼핑 상품수</div><div class="sim-val b">${(data.productCount||0).toLocaleString()}</div><div class="sim-sub">네이버 쇼핑 기준</div></div>
     <div class="sim-card"><div class="sim-icon">📊</div><div class="sim-lbl">경쟁강도</div><div class="sim-val" style="font-size:14px;color:${compColor}">${compLevel}</div><div class="sim-sub">검색량 ÷ 상품수</div></div>
-    <div class="sim-card"><div class="sim-icon">⭐</div><div class="sim-lbl">평균 리뷰수</div><div class="sim-val o">${(data.avgReview||0).toLocaleString()}</div><div class="sim-sub">상위 100개 기준</div></div>
-    <div class="sim-card"><div class="sim-icon">🏆</div><div class="sim-lbl">최고 리뷰수</div><div class="sim-val" style="color:var(--gold)">${(data.maxReview||0).toLocaleString()}</div><div class="sim-sub">1위 상품 기준</div></div>
-    <div class="sim-card"><div class="sim-icon">📭</div><div class="sim-lbl">리뷰 0개 비율</div><div class="sim-val" style="color:${(data.zeroReviewRate||0)>50?'#03C75A':'#D84315'}">${data.zeroReviewRate||0}%</div><div class="sim-sub">${(data.zeroReviewRate||0)>50?'진입 유리 👍':'진입 어려움 ⚠️'}</div></div>
+    <div class="sim-card"><div class="sim-icon">🏪</div><div class="sim-lbl">판매처 수</div><div class="sim-val o">${(data.mallCount||0).toLocaleString()}</div><div class="sim-sub">상위 100개 기준</div></div>
+    <div class="sim-card"><div class="sim-icon">🏷️</div><div class="sim-lbl">브랜드 수</div><div class="sim-val" style="color:var(--purple)">${(data.brandCount||0).toLocaleString()}</div><div class="sim-sub">상위 100개 기준</div></div>
     <div class="sim-card"><div class="sim-icon">💰</div><div class="sim-lbl">평균 판매가</div><div class="sim-val" style="color:var(--red)">${(data.avgPrice||0).toLocaleString()}원</div><div class="sim-sub">최저 ${(data.minPrice||0).toLocaleString()}원</div></div>
+    <div class="sim-card"><div class="sim-icon">📊</div><div class="sim-lbl">중간값 가격</div><div class="sim-val" style="color:var(--t2)">${(data.medianPrice||0).toLocaleString()}원</div><div class="sim-sub">가격 중간값</div></div>
     <div class="sim-card"><div class="sim-icon">💸</div><div class="sim-lbl">시장 평균 CPC</div><div class="sim-val" style="color:var(--orange)">${(data.marketAvgCpc||0).toLocaleString()}원</div><div class="sim-sub">실측 데이터 기반</div></div>
     <div class="sim-card"><div class="sim-icon">👆</div><div class="sim-lbl">예상 일 클릭수</div><div class="sim-val p">${(data.estClicks||0).toLocaleString()}</div><div class="sim-sub">일 예산 ${budget.toLocaleString()}원</div></div>
     ${rankCard}`;
 
-  if (data.aiComment) {
-    document.getElementById('aiAnalysisText').textContent = data.aiComment;
+  // Gemini AI 분석 결과 표시
+  if (data.aiAdvice || data.aiOpportunity) {
+    const confColor = data.aiConfidence==='높음'?'#03C75A':data.aiConfidence==='보통'?'#F59E0B':'#9ca3af';
+    const adviceHtml = (data.aiAdvice||[]).map(a=>`<div style="padding:6px 0;border-bottom:1px solid var(--bd);font-size:13px">• ${a}</div>`).join('');
+    document.getElementById('aiAnalysisText').innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+        <span style="font-size:13px;font-weight:700;color:${confColor}">분석 신뢰도: ${data.aiConfidence||'-'}</span>
+        ${data.aiOpportunity ? `<span style="font-size:12px;color:var(--t2);flex:1">${data.aiOpportunity}</span>` : ''}
+      </div>
+      ${adviceHtml}
+      ${data.cpc !== data.marketAvgCpc ? `<div style="margin-top:12px;padding:10px;background:var(--gl);border-radius:8px;font-size:13px;">
+        🔄 AI 보정 CPC: <strong>${(data.cpc||0).toLocaleString()}원</strong> (기존 ${(data.marketAvgCpc||0).toLocaleString()}원)
+      </div>` : ''}`;
     document.getElementById('aiSec').style.display = 'block';
   } else {
     document.getElementById('aiSec').style.display = 'none';
@@ -925,7 +936,6 @@ function renderSim(kw,budget,dev,data) {
       <td>${(r.totalQcCnt||0).toLocaleString()}</td>
       <td>${(r.productCount||0).toLocaleString()}</td>
       <td><span style="color:${cl};font-weight:600;font-size:11px">${r.compLevel||'-'}</span></td>
-      <td>${(r.avgReview||0).toLocaleString()}</td>
       <td>${(r.avgPrice||0).toLocaleString()}원</td>
       <td>${(r.cpcAvg||0).toLocaleString()}원</td>
       <td style="font-size:11px;color:var(--blue)">${rankTxt}</td>
@@ -942,7 +952,7 @@ function renderSim(kw,budget,dev,data) {
       💡 CPC · 순위는 실제 광고 집행 데이터(2026 Q1) 기반 추정값이에요.
     </div>
     <table><thead><tr>
-      <th>키워드</th><th>검색량</th><th>상품수</th><th>경쟁강도</th><th>평균리뷰</th><th>평균가격</th><th>평균CPC</th><th>예상순위</th><th>예상클릭</th>
+      <th>키워드</th><th>검색량</th><th>상품수</th><th>경쟁강도</th><th>평균가격</th><th>평균CPC</th><th>예상순위</th><th>예상클릭</th>
     </tr></thead>
     <tbody>${rows}</tbody></table>`;
 
