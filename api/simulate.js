@@ -156,57 +156,41 @@ async function getShoppingData(keyword) {
   });
 }
 
-// Gemini AI 분석 - 구조화된 JSON 응답
+// Gemini AI 분석
 async function callGemini(data) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return null;
 
-  const prompt = `당신은 네이버 쇼핑 광고 전문가입니다. 아래 키워드 데이터를 분석해서 반드시 JSON 형식으로만 응답하세요. 마크다운이나 설명 없이 JSON만 출력하세요.
-
-[입력 데이터]
-- 키워드: ${data.keyword}
-- 월간 검색량: ${data.totalQc.toLocaleString()}건 (PC ${data.pcQc.toLocaleString()} / 모바일 ${data.mobQc.toLocaleString()})
-- 모바일 비율: ${data.mobRate}%
-- 쇼핑 상품수: ${data.productCount.toLocaleString()}개
-- 판매처 수: ${data.mallCount}개
-- 브랜드 수: ${data.brandCount}개
-- 평균 판매가: ${data.avgPrice.toLocaleString()}원
-- 최저가: ${data.minPrice.toLocaleString()}원
-- 1차 추정 CPC: ${data.estCpc.toLocaleString()}원
-- 경쟁강도: ${data.compLevel}
-- 일 예산: ${data.budget.toLocaleString()}원
-${data.userBid > 0 ? `- 설정 입찰가: ${data.userBid.toLocaleString()}원` : ''}
-
-[출력 형식 - 반드시 이 JSON만 출력]
-{
-  "revisedCpc": 숫자(원, 정수),
-  "revisedRank": "예상순위 텍스트",
-  "estClicks": 숫자(일 예산 / revisedCpc),
-  "advice": ["조언1", "조언2", "조언3"],
-  "opportunity": "이 키워드의 기회/위험 한줄 요약",
-  "confidence": "높음|보통|낮음"
-}`;
+  const prompt = '네이버 쇼핑 광고 전문가로서 아래 데이터를 분석해 JSON으로만 출력하세요.' +
+    '\n키워드: ' + data.keyword +
+    '\n검색량: ' + data.totalQc +
+    '\n상품수: ' + data.productCount +
+    '\n경쟁강도: ' + data.compLevel +
+    '\n시장CPC: ' + data.estCpc + '원' +
+    '\n일예산: ' + data.budget + '원' +
+    (data.userBid > 0 ? '\n입찰가: ' + data.userBid + '원' : '') +
+    '\n출력형식: {"revisedCpc":숫자,"revisedRank":"순위텍스트","advice":["조언1","조언2","조언3"],"opportunity":"한줄요약","confidence":"높음|보통|낮음"}';
 
   const body = JSON.stringify({
     contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: { temperature: 0.3, maxOutputTokens: 800 }
+    generationConfig: { temperature: 0.3, maxOutputTokens: 600 }
   });
 
   return new Promise((resolve) => {
     const req = https.request({
       hostname: 'generativelanguage.googleapis.com',
-      path: `/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      path: '/v1beta/models/gemini-2.0-flash:generateContent?key=' + apiKey,
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
     }, (r) => {
       let b = ''; r.on('data', c => b += c);
       r.on('end', () => {
         try {
           const d = JSON.parse(b);
           const text = d.candidates?.[0]?.content?.parts?.[0]?.text || '';
-          const clean = text.replace(/```json|```/g, '').trim();
-          const parsed = JSON.parse(clean);
-          resolve(parsed);
+          const m = text.match(/\{[\s\S]*\}/);
+          if (m) resolve(JSON.parse(m[0]));
+          else resolve(null);
         } catch(e) { resolve(null); }
       });
     });
@@ -329,47 +313,12 @@ module.exports = async (req, res) => {
       };
     });
 
-    // Gemini AI 재분석
-    const mobRate = totalQc > 0 ? Math.round((mobQc/totalQc)*100) : 0;
-    const geminiResult = await callGemini({
-      keyword, totalQc, pcQc, mobQc, mobRate,
-      productCount: shopData.total,
-      mallCount: shopData.mallCount,
-      brandCount: shopData.brandCount,
-      avgPrice: shopData.avgPrice,
-      minPrice: shopData.minPrice,
-      estCpc: marketAvgCpc,
-      compLevel: comp.level,
-      budget: budgetNum,
-      userBid,
-    });
-
-    // Gemini 결과로 최종값 보정
-    const finalRevisedCpc = geminiResult?.revisedCpc || finalCpc;
-    const finalEstClicks = finalRevisedCpc > 0 ? Math.floor(budgetNum / finalRevisedCpc) : estClicks;
-    const finalEstRank = geminiResult?.revisedRank || estRank;
-    const aiAdvice = geminiResult?.advice || null;
-    const aiOpportunity = geminiResult?.opportunity || null;
-    const aiConfidence = geminiResult?.confidence || null;
-
-    return res.status(200).json({
-      keyword, pcQcCnt: pcQc, mobileQcCnt: mobQc, totalQcCnt: totalQc,
-      productCount: shopData.total,
-      avgPrice: shopData.avgPrice, minPrice: shopData.minPrice,
-      medianPrice: shopData.medianPrice,
-      mallCount: shopData.mallCount, brandCount: shopData.brandCount,
-      cpc: finalCpc, marketAvgCpc,
-      baseRank: catData?.rank || null,
-      baseRankInfo,
-      estRank, estClicks, estImpressions, recommendedMonthly,
-      compLevel: comp.level, compColor: comp.color,
-      compScore: Math.round(comp.score * 1000) / 1000,
-      cpc: finalRevisedCpc,
-      estClicks: finalEstClicks,
-      estRank: finalEstRank,
-      aiAdvice,
-      aiOpportunity,
-      aiConfidence,
+    const aiAdvice = null;
+    const aiOpportunity = null;
+    const aiConfidence = null;
+    const finalRevisedCpc = finalCpc;
+    const finalEstClicks = estClicks;
+    const finalEstRank = estRank;
       related,
     });
 
