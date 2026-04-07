@@ -47,16 +47,14 @@ module.exports = async (req, res) => {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return res.status(200).json({ error: 'GEMINI_API_KEY 없음' });
 
-  const prompt = `네이버 쇼핑 SEO 전문가로서 아래 정보로 SEO 최적화 상품명을 JSON만 출력하세요.
-
-키워드: ${keyword}
-${brand ? `브랜드: ${brand}` : ''}
-연관키워드(검색량순): ${kwListText || ''}
-
-규칙: 60자이내, 중복단어금지, 각 상품명 다른조합
-
-출력형식(JSON만):
-{"names":[{"name":"상품명","length":글자수,"keywords":["키워드1"]},{"name":"상품명2","length":글자수,"keywords":["키워드1"]},{"name":"상품명3","length":글자수,"keywords":["키워드1"]}],"recommendTags":["태그1","태그2","태그3","태그4","태그5"],"tip":"팁"}`;
+  const brandText = brand ? '브랜드: ' + brand : '';
+  const promptText = '네이버 쇼핑 SEO 전문가로서 상품명 3개를 JSON으로만 출력하세요.' +
+    '\n키워드: ' + keyword +
+    (brandText ? '\n' + brandText : '') +
+    '\n연관키워드: ' + (kwListText || '') +
+    '\n규칙: 60자이내, 중복단어금지, 브랜드명앞배치' +
+    '\n출력: {"names":[{"name":"상품명1","length":10,"keywords":["키워드"]},{"name":"상품명2","length":10,"keywords":["키워드"]},{"name":"상품명3","length":10,"keywords":["키워드"]}],"recommendTags":["태그1","태그2","태그3"],"tip":"팁한줄"}';
+  const prompt = promptText;
 
   const reqBody = JSON.stringify({
     contents: [{ parts: [{ text: prompt }] }],
