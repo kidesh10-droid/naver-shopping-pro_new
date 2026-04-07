@@ -1,4 +1,5 @@
-onst https = require('https');
+// v2
+const https = require('https');
 const https = require('https');
 
 function removeDuplicateWords(name) {
