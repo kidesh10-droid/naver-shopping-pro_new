@@ -27,43 +27,44 @@ module.exports = async (req, res) => {
   res.setHeader('Content-Type', 'application/json');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  // prompt 추출 - 여러 방식 시도
-  let prompt = null;
-
-  // 1. req.body (Vercel이 자동 파싱)
-  if (req.body && req.body.prompt) {
-    prompt = req.body.prompt;
-  }
-  // 2. query string
-  else if (req.query && req.query.prompt) {
-    prompt = req.query.prompt;
-  }
-  // 3. 수동 body 파싱
-  else if (req.method === 'POST') {
+  // body 파싱
+  let body = req.body || {};
+  if (!body.keyword && req.method === 'POST') {
     try {
       const raw = await new Promise((resolve) => {
         let data = '';
         req.on('data', chunk => data += chunk);
         req.on('end', () => resolve(data));
       });
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        prompt = parsed.prompt;
-      }
+      if (raw) body = JSON.parse(raw);
     } catch(e) {}
   }
 
-  if (!prompt) {
-    return res.status(200).json({ 
-      error: 'prompt 없음',
-      debug: { method: req.method, hasBody: !!req.body, bodyKeys: req.body ? Object.keys(req.body) : [] }
-    });
-  }
+  const { keyword, brand, kwListText } = body;
+  if (!keyword) return res.status(200).json({ error: '키워드가 없습니다.' });
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return res.status(200).json({ error: 'GEMINI_API_KEY 없음' });
 
-  const body = JSON.stringify({
+  // Gemini 프롬프트 생성
+  const prompt = `당신은 네이버 쇼핑 SEO 전문가입니다. 아래 정보를 바탕으로 네이버 쇼핑 SEO에 최적화된 상품명을 JSON으로만 출력하세요. 마크다운 없이 JSON만.
+
+[입력 정보]
+- 메인 키워드: ${keyword}
+${brand ? `- 브랜드: ${brand}` : ''}
+- 연관 키워드 (검색량 순): ${kwListText || ''}
+
+[규칙]
+1. 상품명은 60자 이내 (필수)
+2. 검색량 높은 연관 키워드를 자연스럽게 포함
+3. 브랜드명이 있으면 앞에 배치
+4. 동일한 단어 절대 중복 금지
+5. 각 상품명은 서로 다른 키워드 조합으로 작성
+
+[출력 JSON 형식]
+{"names":[{"name":"상품명1","length":글자수,"keywords":["키워드1","키워드2"]},{"name":"상품명2","length":글자수,"keywords":["키워드1","키워드2"]},{"name":"상품명3","length":글자수,"keywords":["키워드1","키워드2"]}],"recommendTags":["태그1","태그2","태그3","태그4","태그5"],"tip":"팁한줄"}`;
+
+  const reqBody = JSON.stringify({
     contents: [{ parts: [{ text: prompt }] }],
     generationConfig: { temperature: 0.4, maxOutputTokens: 1000 }
   });
@@ -74,9 +75,9 @@ module.exports = async (req, res) => {
         hostname: 'generativelanguage.googleapis.com',
         path: `/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          'Content-Length': Buffer.byteLength(body)
+          'Content-Length': Buffer.byteLength(reqBody)
         }
       }, (r) => {
         let b = '';
@@ -84,7 +85,7 @@ module.exports = async (req, res) => {
         r.on('end', () => resolve(b));
       });
       req2.on('error', reject);
-      req2.write(body);
+      req2.write(reqBody);
       req2.end();
     });
 
@@ -98,14 +99,10 @@ module.exports = async (req, res) => {
     }
 
     const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    if (!text) {
-      return res.status(200).json({ error: 'Gemini 응답 텍스트 없음' });
-    }
+    if (!text) return res.status(200).json({ error: 'Gemini 응답 없음' });
 
     const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      return res.status(200).json({ error: 'JSON 추출 실패', raw: text.slice(0, 300) });
-    }
+    if (!jsonMatch) return res.status(200).json({ error: 'JSON 추출 실패', raw: text.slice(0, 300) });
 
     const result = JSON.parse(jsonMatch[0]);
 
