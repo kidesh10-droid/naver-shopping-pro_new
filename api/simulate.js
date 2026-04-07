@@ -216,14 +216,17 @@ ${data.userBid > 0 ? `- 설정 입찰가: ${data.userBid.toLocaleString()}원` :
   });
 }
 
-// 경쟁강도
+// 경쟁강도 (3단계)
 function calcCompetition(searchCnt, productCnt) {
   if (productCnt === 0) return { level: '데이터없음', color: '#9ca3af', score: 0 };
   const ratio = searchCnt / productCnt;
-  if (ratio >= 0.15) return { level: '블루오션 🟢', color: '#03C75A', score: ratio };
-  if (ratio >= 0.08) return { level: '관심키워드 🔵', color: '#1976D2', score: ratio };
-  if (ratio >= 0.03) return { level: '경쟁보통 🟡', color: '#F59E0B', score: ratio };
-  if (ratio >= 0.01) return { level: '경쟁심화 🟠', color: '#F57C00', score: ratio };
+
+  // 상품수 50만 이상은 무조건 레드오션
+  if (productCnt >= 500000) return { level: '레드오션 🔴', color: '#D84315', score: ratio };
+
+  // 3단계 분류
+  if (ratio >= 0.08) return { level: '블루오션 🟢', color: '#03C75A', score: ratio };
+  if (ratio >= 0.02) return { level: '보통 🟡', color: '#F59E0B', score: ratio };
   return { level: '레드오션 🔴', color: '#D84315', score: ratio };
 }
 
