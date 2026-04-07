@@ -319,6 +319,20 @@ module.exports = async (req, res) => {
     const finalRevisedCpc = finalCpc;
     const finalEstClicks = estClicks;
     const finalEstRank = estRank;
+
+    return res.status(200).json({
+      keyword, pcQcCnt: pcQc, mobileQcCnt: mobQc, totalQcCnt: totalQc,
+      productCount: shopData.total,
+      avgPrice: shopData.avgPrice, minPrice: shopData.minPrice,
+      medianPrice: shopData.medianPrice,
+      mallCount: shopData.mallCount, brandCount: shopData.brandCount,
+      cpc: finalRevisedCpc, marketAvgCpc,
+      baseRank: catData?.rank || null,
+      baseRankInfo,
+      estRank: finalEstRank, estClicks: finalEstClicks, estImpressions, recommendedMonthly,
+      compLevel: comp.level, compColor: comp.color,
+      compScore: Math.round(comp.score * 1000) / 1000,
+      aiAdvice, aiOpportunity, aiConfidence,
       related,
     });
 
