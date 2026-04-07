@@ -2,7 +2,100 @@ const https = require('https');
 const crypto = require('crypto');
 const CUSTOMER_ID = '2905718';
 
-// 네이버 쇼핑 상품수 + 리뷰 데이터 조회
+// ===== 1분기 실제 광고 집행 데이터 (2026 Q1) =====
+// CPC: 실제 지불 평균 CPC / RANK: 실제 평균 노출순위
+const CATEGORY_DATA = {
+  '전기매트':    { cpc: 3115, rank: 3.1 },
+  '온열매트':    { cpc: 3000, rank: 3.5 },
+  '진공포장기':  { cpc: 1807, rank: 3.8 },
+  '진공포장':    { cpc: 1500, rank: 4.0 },
+  '마이크':      { cpc: 1341, rank: 4.8 },
+  'XLR마이크':   { cpc: 1291, rank: 2.8 },
+  '콘덴서마이크':{ cpc: 1500, rank: 4.0 },
+  '미니가습기':  { cpc: 1641, rank: 4.3 },
+  '초음파가습기':{ cpc: 1306, rank: 4.3 },
+  'USB가습기':   { cpc: 1252, rank: 5.7 },
+  '사무실가습기':{ cpc: 1218, rank: 5.7 },
+  '가습기':      { cpc: 1130, rank: 4.6 },
+  '휴대용가습기':{ cpc: 1130, rank: 4.6 },
+  '무선가습기':  { cpc: 388,  rank: 1.0 },
+  '디테일링에어건':{ cpc: 1435, rank: 3.6 },
+  '차량용에어건':{ cpc: 1287, rank: 5.4 },
+  '에어건':      { cpc: 1287, rank: 3.8 },
+  '무선에어건':  { cpc: 908,  rank: 6.6 },
+  '에어컴프레서':{ cpc: 1200, rank: 4.0 },
+  '전기포트':    { cpc: 1258, rank: 4.5 },
+  '분유포트':    { cpc: 1100, rank: 4.5 },
+  '스팀다리미':  { cpc: 1096, rank: 4.4 },
+  '다리미':      { cpc: 1000, rank: 4.5 },
+  '의류관리기':  { cpc: 1200, rank: 4.0 },
+  '커피머신':    { cpc: 925,  rank: 3.2 },
+  '에스프레소':  { cpc: 1100, rank: 4.0 },
+  '커피포트':    { cpc: 900,  rank: 4.0 },
+  '헤어드라이어':{ cpc: 1109, rank: 4.2 },
+  '드라이기':    { cpc: 1109, rank: 4.2 },
+  '고데기':      { cpc: 900,  rank: 4.5 },
+  '노이즈캔슬링이어폰': { cpc: 1039, rank: 7.5 },
+  '블루투스이어폰':{ cpc: 900, rank: 6.0 },
+  '무선이어폰':  { cpc: 850,  rank: 6.0 },
+  '이어폰':      { cpc: 803,  rank: 6.8 },
+  '오픈형이어폰':{ cpc: 850,  rank: 6.0 },
+  '냉장고':      { cpc: 591,  rank: 2.2 },
+  '휴대용냉장고':{ cpc: 591,  rank: 2.2 },
+  '차량용냉장고':{ cpc: 700,  rank: 2.5 },
+  '마사지기':    { cpc: 1300, rank: 4.0 },
+  '안마기':      { cpc: 1200, rank: 4.0 },
+};
+
+// 키워드 → 카테고리 데이터 매핑 (긴 키워드 우선)
+function findCategoryData(keyword) {
+  const sorted = Object.keys(CATEGORY_DATA).sort((a,b) => b.length - a.length);
+  for (const cat of sorted) {
+    if (keyword.includes(cat)) return { ...CATEGORY_DATA[cat], matched: cat };
+  }
+  return null;
+}
+
+// CPC 추정
+function estimateCpc(keyword, totalSearch, productCount, device) {
+  const catData = findCategoryData(keyword);
+  if (catData) {
+    return device === 'mobile' ? Math.round(catData.cpc * 0.85) : catData.cpc;
+  }
+  if (totalSearch === 0) return 200;
+  const density = productCount > 0 ? productCount / totalSearch : 5;
+  const logSearch = Math.log10(totalSearch + 1);
+  const devMult = device === 'mobile' ? 0.85 : 1.0;
+  let cpc = density * logSearch * 180 * devMult * 0.30;
+  return Math.round(Math.max(70, Math.min(cpc, 5000)) / 10) * 10;
+}
+
+// 실측 기반 노출순위 추정
+function inferRank(userBid, marketCpc, catRank, totalSearch) {
+  if (!userBid || userBid === 0) return '입찰가 입력 시 확인 가능';
+
+  // 실측 평균순위 기준으로 입찰가 비율 적용
+  const baseRank = catRank || 5.0; // 카테고리 실측 평균순위
+  const ratio = userBid / marketCpc;
+
+  let estRank;
+  if (ratio >= 2.0)      estRank = Math.max(1, baseRank * 0.3);
+  else if (ratio >= 1.5) estRank = Math.max(1, baseRank * 0.5);
+  else if (ratio >= 1.2) estRank = Math.max(1, baseRank * 0.7);
+  else if (ratio >= 1.0) estRank = baseRank;
+  else if (ratio >= 0.8) estRank = baseRank * 1.3;
+  else if (ratio >= 0.6) estRank = baseRank * 1.7;
+  else                   estRank = baseRank * 2.5;
+
+  estRank = Math.round(estRank * 10) / 10;
+
+  if (estRank <= 2)       return `약 ${estRank}위 (최상단)`;
+  else if (estRank <= 5)  return `약 ${estRank}위 (상위권)`;
+  else if (estRank <= 10) return `약 ${estRank}위 (중위권)`;
+  else                    return `약 ${Math.round(estRank)}위 이하`;
+}
+
+// 쇼핑 데이터 조회
 async function getShoppingData(keyword) {
   return new Promise((resolve) => {
     https.get({
@@ -18,29 +111,25 @@ async function getShoppingData(keyword) {
         try {
           const d = JSON.parse(b);
           const items = d.items || [];
-          const total = d.total || 0;
-
-          // 리뷰 데이터 분석
-          const reviews = items.map(i => parseInt(i.reviewCount) || 0);
-          const reviewSum = reviews.reduce((a, b) => a + b, 0);
-          const avgReview = reviews.length > 0 ? Math.round(reviewSum / reviews.length) : 0;
-          const maxReview = reviews.length > 0 ? Math.max(...reviews) : 0;
-          const zeroReviewCount = reviews.filter(r => r === 0).length;
-          const zeroReviewRate = reviews.length > 0 ? Math.round((zeroReviewCount / reviews.length) * 100) : 0;
-
-          // 가격 데이터
-          const prices = items.map(i => parseInt(i.lprice) || 0).filter(p => p > 0);
-          const avgPrice = prices.length > 0 ? Math.round(prices.reduce((a,b) => a+b, 0) / prices.length) : 0;
-          const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
-
-          resolve({ total, avgReview, maxReview, zeroReviewRate, avgPrice, minPrice, items: items.slice(0, 5) });
-        } catch(e) { resolve({ total: 0, avgReview: 0, maxReview: 0, zeroReviewRate: 0, avgPrice: 0, minPrice: 0, items: [] }); }
+          const reviews = items.map(i => parseInt(i.reviewCount)||0);
+          const prices = items.map(i => parseInt(i.lprice)||0).filter(p=>p>0);
+          resolve({
+            total: d.total || 0,
+            avgReview: reviews.length > 0 ? Math.round(reviews.reduce((a,b)=>a+b,0)/reviews.length) : 0,
+            maxReview: reviews.length > 0 ? Math.max(...reviews) : 0,
+            zeroReviewRate: reviews.length > 0 ? Math.round((reviews.filter(r=>r===0).length/reviews.length)*100) : 0,
+            avgPrice: prices.length > 0 ? Math.round(prices.reduce((a,b)=>a+b,0)/prices.length) : 0,
+            minPrice: prices.length > 0 ? Math.min(...prices) : 0,
+          });
+        } catch(e) {
+          resolve({ total:0, avgReview:0, maxReview:0, zeroReviewRate:0, avgPrice:0, minPrice:0 });
+        }
       });
-    }).on('error', () => resolve({ total: 0, avgReview: 0, maxReview: 0, zeroReviewRate: 0, avgPrice: 0, minPrice: 0, items: [] }));
+    }).on('error', () => resolve({ total:0, avgReview:0, maxReview:0, zeroReviewRate:0, avgPrice:0, minPrice:0 }));
   });
 }
 
-// 경쟁강도 계산
+// 경쟁강도
 function calcCompetition(searchCnt, productCnt) {
   if (productCnt === 0) return { level: '데이터없음', color: '#9ca3af', score: 0 };
   const ratio = searchCnt / productCnt;
@@ -49,39 +138,6 @@ function calcCompetition(searchCnt, productCnt) {
   if (ratio >= 0.03) return { level: '경쟁보통 🟡', color: '#F59E0B', score: ratio };
   if (ratio >= 0.01) return { level: '경쟁심화 🟠', color: '#F57C00', score: ratio };
   return { level: '레드오션 🔴', color: '#D84315', score: ratio };
-}
-
-// CPC 추정
-function estimateCpc(totalSearch, productCount, device) {
-  if (totalSearch === 0) return 100;
-  const density = productCount > 0 ? productCount / totalSearch : 10;
-  const logSearch = Math.log10(totalSearch + 1);
-  const deviceMult = device === 'mobile' ? 0.85 : 1.0;
-  let cpc = density * logSearch * 180 * deviceMult;
-  cpc = Math.max(70, Math.min(cpc, 8000));
-  return Math.round(cpc / 10) * 10;
-}
-
-// 예상 노출 순위
-function inferRank(userBid, avgCpc, totalSearch) {
-  if (!userBid || userBid === 0) return '입찰가 입력 시 확인 가능';
-  const ratio = userBid / avgCpc;
-  if (totalSearch > 100000) {
-    if (ratio >= 2.0) return '1~3위 (최상단)';
-    if (ratio >= 1.5) return '4~8위 (상위권)';
-    if (ratio >= 1.0) return '9~15위 (중위권)';
-    return '15위 이하';
-  } else if (totalSearch > 30000) {
-    if (ratio >= 1.5) return '1~3위 (최상단)';
-    if (ratio >= 1.1) return '4~10위 (상위권)';
-    if (ratio >= 0.8) return '11~20위 (중위권)';
-    return '20위 이하';
-  } else {
-    if (ratio >= 1.2) return '1~3위 (독점)';
-    if (ratio >= 0.9) return '4~10위 (안정권)';
-    if (ratio >= 0.6) return '11~20위';
-    return '20위 이하';
-  }
 }
 
 module.exports = async (req, res) => {
@@ -104,7 +160,6 @@ module.exports = async (req, res) => {
     const signature = crypto.createHmac('sha256', Buffer.from(process.env.NAVER_AD_SECRET_KEY, 'utf-8'))
       .update(Buffer.from(msg, 'utf-8')).digest('base64');
 
-    // 검색량 + 쇼핑 데이터 병렬 호출
     const [kwData, shopData] = await Promise.all([
       new Promise((resolve, reject) => {
         function doReq(opts) {
@@ -149,25 +204,26 @@ module.exports = async (req, res) => {
     const budgetNum = parseInt(budget);
     const userBid = parseInt(bid);
 
-    const marketAvgCpc = estimateCpc(totalQc, shopData.total, device);
+    const catData = findCategoryData(keyword);
+    const marketAvgCpc = estimateCpc(keyword, totalQc, shopData.total, device);
     const finalCpc = userBid > 0 ? userBid : marketAvgCpc;
     const comp = calcCompetition(totalQc, shopData.total);
-    const estRank = inferRank(userBid, marketAvgCpc, totalQc);
+    const estRank = inferRank(userBid, marketAvgCpc, catData?.rank, totalQc);
+    const baseRankInfo = catData ? `실측 평균 ${catData.rank}위 기준` : '추정값';
     const estClicks = finalCpc > 0 ? Math.floor(budgetNum / finalCpc) : 0;
     const estImpressions = Math.floor(estClicks * 12);
     const recommendedMonthly = budgetNum * 30;
 
     // 연관 키워드 병렬 조회
     const relatedRaw = kwList.slice(0, 10);
-    const relatedShopData = await Promise.all(
-      relatedRaw.map(k => getShoppingData(k.relKeyword))
-    );
+    const relatedShopData = await Promise.all(relatedRaw.map(k => getShoppingData(k.relKeyword)));
 
     const related = relatedRaw.map((k, i) => {
-      const kt = (parseInt(k.monthlyPcQcCnt) || 0) + (parseInt(k.monthlyMobileQcCnt) || 0);
+      const kt = (parseInt(k.monthlyPcQcCnt)||0) + (parseInt(k.monthlyMobileQcCnt)||0);
       const kShop = relatedShopData[i];
       const kComp = calcCompetition(kt, kShop.total);
-      const kCpc = estimateCpc(kt, kShop.total, device);
+      const kCatData = findCategoryData(k.relKeyword);
+      const kCpc = estimateCpc(k.relKeyword, kt, kShop.total, device);
       return {
         keyword: k.relKeyword,
         totalQcCnt: kt,
@@ -178,29 +234,22 @@ module.exports = async (req, res) => {
         compLevel: kComp.level,
         compColor: kComp.color,
         estClicks: kCpc > 0 ? Math.floor(budgetNum / kCpc) : 0,
-        estRank: inferRank(userBid || kCpc, kCpc, kt),
+        estRank: inferRank(userBid || kCpc, kCpc, kCatData?.rank, kt),
+        baseRank: kCatData?.rank || null,
       };
     });
 
     return res.status(200).json({
-      keyword,
-      pcQcCnt: pcQc,
-      mobileQcCnt: mobQc,
-      totalQcCnt: totalQc,
+      keyword, pcQcCnt: pcQc, mobileQcCnt: mobQc, totalQcCnt: totalQc,
       productCount: shopData.total,
-      avgReview: shopData.avgReview,
-      maxReview: shopData.maxReview,
+      avgReview: shopData.avgReview, maxReview: shopData.maxReview,
       zeroReviewRate: shopData.zeroReviewRate,
-      avgPrice: shopData.avgPrice,
-      minPrice: shopData.minPrice,
-      cpc: finalCpc,
-      marketAvgCpc,
-      estRank,
-      estClicks,
-      estImpressions,
-      recommendedMonthly,
-      compLevel: comp.level,
-      compColor: comp.color,
+      avgPrice: shopData.avgPrice, minPrice: shopData.minPrice,
+      cpc: finalCpc, marketAvgCpc,
+      baseRank: catData?.rank || null,
+      baseRankInfo,
+      estRank, estClicks, estImpressions, recommendedMonthly,
+      compLevel: comp.level, compColor: comp.color,
       compScore: Math.round(comp.score * 1000) / 1000,
       related,
     });
