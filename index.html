@@ -739,8 +739,8 @@ function renderKw(kw,kData,dData) {
   document.getElementById('kwBody').innerHTML=sorted.slice(0,20).map(k=>{
     const p=parseInt(k.monthlyPcQcCnt)||0,m=parseInt(k.monthlyMobileQcCnt)||0,t=p+m;
     const pct=Math.round((t/maxT)*100);
-    const cl=k.compIdx==='high'?'#D84315':k.compIdx==='mid'?'#F59E0B':'#03C75A';
-    const cl2=k.compIdx==='high'?'높음':k.compIdx==='mid'?'중간':'낮음';
+    const cl=k.compIdx==='high'?'#D84315':k.compIdx==='low'?'#03C75A':'#F59E0B';
+    const cl2=k.compIdx==='high'?'레드오션 🔴':k.compIdx==='low'?'블루오션 🟢':'보통 🟡';
     return `<tr><td style="font-weight:500">${k.relKeyword}</td><td>${p.toLocaleString()}</td><td>${m.toLocaleString()}</td><td style="font-weight:700">${t.toLocaleString()}</td>
       <td><div class="compbar"><div class="compbar-in" style="width:${pct}%;max-width:80px;background:${cl}"></div><span class="complbl" style="color:${cl}">${cl2}</span></div></td></tr>`;
   }).join('');
